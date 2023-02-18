@@ -3,48 +3,73 @@
 using System;
 using System.IO;
 
-using VoiceChat;
-
 using SlApi.Extensions;
 
 namespace SlApi.Audio
 {
+    public enum PcmSample : int
+    {
+        EightBit = 1,
+        SixteenBit = 2
+    }
+
     public static class OggEncoder
     {
         public const int WriteBufferSize = 512;
 
-        public static void EncodeRawPcm(byte[] pcmData, TaskResult<byte[]> result)
+        public static void EncodeRawPcm(
+            int outputSampleRate, 
+            int outputChannels, 
+
+            byte[] pcmSamples, 
+
+            PcmSample pcmSampleSize, 
+
+            int pcmSampleRate, 
+            int pcmChannels,
+
+            TaskResult<byte[]> result)
         {
             try
             {
-                var numPcmSamples = pcmData.Length;
-                var pcmDuration = numPcmSamples / (float)VoiceChatSettings.SampleRate;
-                var numOutputSamples = (int)(pcmDuration * VoiceChatSettings.SampleRate);
+                int numPcmSamples = (pcmSamples.Length / (int)pcmSampleSize / pcmChannels);
+                float pcmDuraton = numPcmSamples / (float)pcmSampleRate;
 
+                int numOutputSamples = (int)(pcmDuraton * outputSampleRate);
                 numOutputSamples = (numOutputSamples / WriteBufferSize) * WriteBufferSize;
 
-                float[][] outSamples = new float[VoiceChatSettings.Channels][];
+                float[][] outSamples = new float[outputChannels][];
 
-                for (int ch = 0; ch < VoiceChatSettings.Channels; ch++)
+                for (int ch = 0; ch < outputChannels; ch++)
+                {
                     outSamples[ch] = new float[numOutputSamples];
+                }
 
                 for (int sampleNumber = 0; sampleNumber < numOutputSamples; sampleNumber++)
                 {
                     float rawSample = 0.0f;
 
-                    for (int ch = 0; ch < VoiceChatSettings.Channels; ch++)
+                    for (int ch = 0; ch < outputChannels; ch++)
                     {
-                        int sampleIndex = sampleNumber * VoiceChatSettings.Channels;
+                        int sampleIndex = (sampleNumber * pcmChannels) * (int)pcmSampleSize;
 
-                        if (ch < VoiceChatSettings.Channels)
-                            sampleIndex += ch;
+                        if (ch < pcmChannels) sampleIndex += (ch * (int)pcmSampleSize);
 
-                        rawSample = ShortToSample((short)(pcmData[sampleIndex + 1] << 8 | pcmData[sampleIndex]));
+                        switch (pcmSampleSize)
+                        {
+                            case PcmSample.EightBit:
+                                rawSample = ByteToSample(pcmSamples[sampleIndex]);
+                                break;
+                            case PcmSample.SixteenBit:
+                                rawSample = ShortToSample((short)(pcmSamples[sampleIndex + 1] << 8 | pcmSamples[sampleIndex]));
+                                break;
+                        }
+
                         outSamples[ch][sampleNumber] = rawSample;
                     }
                 }
 
-                result.Result = BytesToFileFormat(outSamples);
+                result.Result = BytesToFileFormat(outSamples, outputSampleRate, outputChannels);
                 result.Error = null;
                 result.IsSuccesfull = true;
                 result.IsFinished = true;
@@ -58,15 +83,14 @@ namespace SlApi.Audio
             }
         }
 
-        private static byte[] BytesToFileFormat(float[][] floatSamples)
+        private static byte[] BytesToFileFormat(float[][] floatSamples, int sampleRate, int channels)
         {
-            MemoryStream outputData = new MemoryStream();
-
-            var info = VorbisInfo.InitVariableBitRate(VoiceChatSettings.Channels, VoiceChatSettings.SampleRate, 0.5f);
+            var outputData = new MemoryStream();
+            var info = VorbisInfo.InitVariableBitRate(channels, sampleRate, 0.5f);
             var serial = new Random().Next();
             var oggStream = new OggStream(serial);
-            var comments = new Comments();
 
+            var comments = new Comments();
             comments.AddTag("ARTIST", "TEST");
 
             var infoPacket = HeaderPacketBuilder.BuildInfoPacket(info);
@@ -102,7 +126,11 @@ namespace SlApi.Audio
 
             FlushPages(oggStream, outputData, true);
 
-            return outputData.ToArray();
+            var data = outputData.ToArray();
+
+            outputData.Dispose();
+
+            return data;
         }
 
         private static void FlushPages(OggStream oggStream, Stream output, bool force)

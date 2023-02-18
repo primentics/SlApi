@@ -42,8 +42,6 @@ namespace SlApi.Events.Handlers
 
             DestroySpawnables();
 
-            AudioPlayer.BlacklistedSelf.Clear();
-
             try { AudioPlayer.DestroyAll(); } catch { }
             try { DummyPlayer.DestroyAll(); } catch { }
         }

@@ -8,7 +8,5 @@ namespace SlApi.Audio
 
         public bool Loop;
         public bool Play;
-
-        public VoiceChatChannel Channel;
     }
 }

@@ -7,7 +7,6 @@ namespace SlApi.Features.PlayerStates.FreezeStates
     public class PlayerFreezeState : PlayerStateBase
     {
         private Vector3 _freezePos;
-        private Quaternion _freezeRot;
         private PlayerFreezeStateReason _reason;
 
         public PlayerFreezeState(ReferenceHub hub, PlayerFreezeStateReason reason) : base(hub) 
@@ -29,14 +28,12 @@ namespace SlApi.Features.PlayerStates.FreezeStates
 
         public override void OnAdded()
         {
-            _freezePos = Target.GetRealPosition();
-            _freezeRot = Target.GetRealRotation();
+            _freezePos = Target.transform.position;
         }
 
         public override void UpdateState()
         {
             Target.SetPosition(_freezePos);
-            Target.SetRotation(_freezeRot);
         }
     }
 }

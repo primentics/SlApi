@@ -5,7 +5,7 @@ using Mirror;
 using PlayerRoles.FirstPersonControl;
 using PlayerRoles.FirstPersonControl.NetworkMessages;
 using PlayerRoles.Visibility;
-
+using SlApi.Dummies;
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.InvisibleStates;
 
@@ -25,7 +25,9 @@ namespace SlApi.Patches.Feature
 
             foreach (var hub in ReferenceHub.AllHubs)
             {
-                if (hub.netId != receiver.netId && hub.roleManager.CurrentRole is IFpcRole fpcRole)
+                if (DummyPlayer.TryGetDummy(hub, out var dummy) && (dummy.IsInvisible || dummy.IsInvisibleTo(receiver.netId)))
+                    continue;
+                else if (hub.netId != receiver.netId && hub.roleManager.CurrentRole is IFpcRole fpcRole)
                 {
                     bool isInvisible = controller != null && !controller.ValidateVisibility(hub);
 

@@ -19,7 +19,7 @@ namespace SlApi
         public static event Action OnLoaded;
         public static event Action OnUnloading;
 
-        [PluginEntryPoint("SlApi", "2.0.0", "A custom API for SCP: Secret Laboratory servers.", "azyworks")]
+        [PluginEntryPoint("SlApi", "2.0.1", "A custom API for SCP: Secret Laboratory servers.", "azyworks")]
         public void Load()
         {
             CosturaUtility.Initialize();

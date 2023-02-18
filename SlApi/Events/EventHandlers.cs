@@ -2,9 +2,8 @@
 using PluginAPI.Events;
 
 using SlApi.Events.Handlers;
-
+using SlApi.Features.Overwatch;
 using System.Collections.Generic;
-
 using System.Linq;
 
 namespace SlApi.Events
@@ -19,6 +18,8 @@ namespace SlApi.Events
 
             EventManager.RegisterEvents<RoundHandlers>(EntryPoint.Instance);
             EventManager.RegisterEvents<PlayerHandlers>(EntryPoint.Instance);
+
+            PersistentOverwatch.Init();
         }
 
         public static void UnregisterBase()
@@ -41,10 +42,22 @@ namespace SlApi.Events
 
         public static void TriggerEvents(ServerEventType type, params object[] args)
         {
-            var handlers = CustomHandlers.Where(x => x.Type == type);
+            for (int i = 0; i < CustomHandlers.Count; i++)
+            {
+                var element = CustomHandlers.ElementAt(i);
 
-            foreach (var handler in handlers)
-                handler.Trigger(args);
+                if (element.Type == type)
+                {
+                    try
+                    {
+                        element.Trigger(args);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Logger.Error($"EventHandlers: Failed to trigger event {element.Type} ({element.DelegateName}) ({ex.Message})");
+                    }
+                }
+            }
         }
 
         private static void OnUnloading()

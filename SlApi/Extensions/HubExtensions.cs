@@ -1,11 +1,16 @@
-﻿using Hints;
+﻿using AngleSharp.Io;
+using Hints;
 
 using Interactables.Interobjects.DoorUtils;
+
+using InventorySystem;
+using InventorySystem.Items;
 using InventorySystem.Items.Keycards;
+
+using MapGeneration.Distributors;
 
 using PlayerRoles;
 using PlayerRoles.FirstPersonControl;
-using PlayerRoles.FirstPersonControl.NetworkMessages;
 
 using PlayerStatsSystem;
 
@@ -14,6 +19,7 @@ using RelativePositioning;
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.ResizeStates;
 
+using System;
 using System.Linq;
 
 using UnityEngine;
@@ -22,7 +28,142 @@ namespace SlApi.Extensions
 {
     public static class HubExtensions
     {
-        public static bool HasKeycardPermission(this ReferenceHub hub, KeycardPermissions permissions, bool requiresAllPermissions = false)
+        public static AhpStat.AhpProcess[] GetActiveAhpProcesses(this ReferenceHub hub)
+        {
+            if (!hub.playerStats.TryGetModule<AhpStat>(out var module))
+            {
+                return Array.Empty<AhpStat.AhpProcess>();
+            }
+
+            return module._activeProcesses.ToArray();
+        }
+
+        public static void RemoveItem(this ReferenceHub hub, ItemBase item)
+            => hub.inventory.ServerRemoveItem(item.ItemSerial, item.PickupDropModel);
+
+        public static void RemoveItems(this ReferenceHub hub)
+        {
+            for (int i = 0; i < hub.inventory.UserInventory.Items.Count; i++)
+                hub.RemoveItem(hub.inventory.UserInventory.Items.ElementAt(i).Value);
+
+            hub.inventory.CurInstance = null;
+            hub.inventory.UserInventory.Items.Clear();
+            hub.inventory.UserInventory.ReserveAmmo.Clear();
+            hub.inventory.SendItemsNextFrame = true;
+            hub.inventory.SendAmmoNextFrame = true;
+        }
+
+        public static ItemBase[] GetItems(this ReferenceHub hub)
+        {
+            if (!hub.inventory.UserInventory.Items.Any())
+                return Array.Empty<ItemBase>();
+
+            return hub.inventory.UserInventory.Items.Values.ToArray();
+        }
+
+        public static ushort GetAmmo(this ReferenceHub hub, ItemType item)
+        {
+            if (hub.inventory.UserInventory.ReserveAmmo.TryGetValue(item, out var ammo))
+                return ammo;
+
+            return 0;
+        }
+
+        public static void SetAmmo(this ReferenceHub hub, ItemType ammo, ushort amount)
+        {
+            hub.inventory.UserInventory.ReserveAmmo[ammo] = amount;
+            hub.inventory.SendAmmoNextFrame = true;
+        }
+
+        public static bool IsTagHidden(this ReferenceHub hub)
+            => !string.IsNullOrEmpty(hub.serverRoles.HiddenBadge);
+
+        public static void ShowTag(this ReferenceHub hub)
+        {
+            hub.serverRoles.HiddenBadge = null;
+            hub.serverRoles.GlobalHidden = false;
+            hub.serverRoles.RpcResetFixed();
+            hub.serverRoles.RefreshPermissions(true);
+        }
+
+        public static void HideTag(this ReferenceHub hub)
+        {
+            if (!hub.serverRoles.BypassStaff)
+            {
+                if (!string.IsNullOrEmpty(hub.serverRoles.HiddenBadge))
+                    return;
+
+                if (string.IsNullOrEmpty(hub.serverRoles.MyText))
+                    return;
+            }
+
+            hub.serverRoles.GlobalHidden = hub.serverRoles.GlobalSet;
+            hub.serverRoles.HiddenBadge = hub.serverRoles.MyText;
+            hub.serverRoles.NetworkGlobalBadge = null;
+            hub.serverRoles.SetText(null);
+            hub.serverRoles.SetColor(null);
+            hub.serverRoles.RefreshHiddenTag();
+        }
+
+        public static bool TryGetRoleKey(this ReferenceHub hub, out string roleKey)
+        {
+            if (ServerStatic.PermissionsHandler is null)
+            {
+                roleKey = null;
+                return false;
+            }
+
+            if (ServerStatic.PermissionsHandler._members.TryGetValue(hub.characterClassManager.UserId, out roleKey))
+            {
+                return true; 
+            }
+            else if (!string.IsNullOrWhiteSpace(hub.characterClassManager.UserId2))
+            {
+                if (ServerStatic.PermissionsHandler._members.TryGetValue(hub.characterClassManager.UserId2, out roleKey))
+                {
+                    return true;
+                }
+            }
+
+            roleKey = null;
+            return false;
+        }
+
+        public static bool CanOpenLocker(this ReferenceHub hub, LockerChamber locker)
+        {
+            if (hub.playerEffectsController.GetEffect<CustomPlayerEffects.AmnesiaItems>().IsEnabled)
+                return false;
+
+            foreach (var item in hub.inventory.UserInventory.Items.Values)
+            {
+                if (!(item is KeycardItem keycardItem))
+                    continue;
+
+                if (keycardItem.Permissions.HasFlagFast(locker.RequiredPermissions))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public static bool CanOpenGenerator(this ReferenceHub hub, Scp079Generator generator)
+        {
+            if (hub.playerEffectsController.GetEffect<CustomPlayerEffects.AmnesiaItems>().IsEnabled)
+                return false;
+
+            foreach (var item in hub.inventory.UserInventory.Items.Values)
+            {
+                if (!(item is KeycardItem keycardItem))
+                    continue;
+
+                if (keycardItem.Permissions.HasFlagFast(generator._requiredPermission))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public static bool HasPermissions(this ReferenceHub hub, KeycardPermissions permissions, bool requiresAllPermissions = false)
         {
             if (hub.playerEffectsController.TryGetEffect<CustomPlayerEffects.AmnesiaItems>(out var effect) && effect.IsEnabled)
                 return false;
@@ -30,9 +171,9 @@ namespace SlApi.Extensions
             if (hub.inventory.CurInstance != null && hub.inventory.CurInstance is KeycardItem keycard)
                 return requiresAllPermissions ? keycard.Permissions.HasFlag(permissions) : (keycard.Permissions & permissions) != 0;
 
-            foreach (var item in hub.inventory.UserInventory.Items)
+            foreach (var item in hub.inventory.UserInventory.Items.Values)
             {
-                if (item.Value is KeycardItem card)
+                if (item is KeycardItem card)
                 {
                     if ((requiresAllPermissions ? card.Permissions.HasFlag(permissions) : (card.Permissions & permissions) != 0))
                     {
@@ -49,15 +190,7 @@ namespace SlApi.Extensions
 
         public static void SetPosition(this ReferenceHub hub, Vector3 position)
         {
-            if (hub.roleManager.CurrentRole is IFpcRole fpcRole && fpcRole.FpcModule != null)
-            {
-                var module = fpcRole.FpcModule;
-
-                module._cachedPosition = position;
-                module._transform.position = position;
-
-                hub.connectionToClient.Send(new FpcOverrideMessage(position, hub.GetRealRotation().eulerAngles.magnitude));
-            }
+            hub.TryOverridePosition(position, Vector3.zero);
         }
 
         public static void SetRotation(this ReferenceHub hub, Quaternion rotation)
@@ -115,9 +248,14 @@ namespace SlApi.Extensions
             hub.characterClassManager.ConsolePrint(message.ToString(), color);
         }
 
-        public static void PersonalHint(this ReferenceHub hub, object message, ushort time)
+        public static void PersonalHint(this ReferenceHub hub, object message, float time)
         {
-            hub.hints.Show(new TextHint(message.ToString(), null, null, time));
+            HintParameter[] parameters =
+            {
+                new StringHintParameter(message.ToString())
+            };
+
+            hub.networkIdentity.connectionToClient.Send(new HintMessage(new TextHint(message.ToString(), parameters, durationScalar: time)));
         }
 
         public static void PersonalBroadcast(this ReferenceHub hub, object message, ushort time)

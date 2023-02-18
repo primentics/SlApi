@@ -25,7 +25,7 @@ namespace SlApi.Audio
     public class AudioConverter
     {
         [Config("Ffmpeg.Preset", "The preset to use for audio conversion.")]
-        public static AudioPreset Preset { get; set; } = AudioPreset.veryfast;
+        public static AudioPreset Preset { get; set; } = AudioPreset.veryslow;
 
         public string Mp4FilePath { get; private set; }
         public string RawFilePath { get; private set; }
@@ -44,7 +44,7 @@ namespace SlApi.Audio
             FfmpegProcess = new Process();
             FfmpegProcess.StartInfo = new ProcessStartInfo()
             {
-                Arguments = $"-i {Mp4FilePath} -ac {VoiceChatSettings.Channels} -b:a {VoiceChatSettings.MaxBitrate} " +
+                Arguments = $"-i {Mp4FilePath} -ac {VoiceChatSettings.Channels} " +
                             $"-preset {Preset} -acodec pcm_s16le -f s16le -ar {VoiceChatSettings.SampleRate} {RawFilePath}",
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -82,7 +82,18 @@ namespace SlApi.Audio
             {
                 try
                 {
-                    OggEncoder.EncodeRawPcm(input, OggResult);
+                    OggEncoder.EncodeRawPcm(
+                        VoiceChatSettings.SampleRate,
+                        VoiceChatSettings.Channels,
+
+                        input,
+
+                        PcmSample.SixteenBit,
+
+                        VoiceChatSettings.SampleRate,
+                        VoiceChatSettings.Channels,
+
+                        OggResult);
                 }
                 catch (Exception ex)
                 {

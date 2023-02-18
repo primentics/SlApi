@@ -13,6 +13,11 @@
 
         PlayerStates,
 
-        Events
+        Events,
+
+        RespawnTimer,
+        RandomEvents,
+
+        CustomLoadouts
     }
 }

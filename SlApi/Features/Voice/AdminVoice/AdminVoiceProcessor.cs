@@ -2,7 +2,6 @@
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.AdminVoiceStates;
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,7 +18,10 @@ namespace SlApi.Features.Voice.AdminVoice
         public static bool KeepChannels { get; set; } = true;
 
         [Config("AdminVoice.PredefinedChannels", "A list of predefined admin-only voice channels.")]
-        public static AdminVoiceChannel[] PredefinedChannels { get; set; } = Array.Empty<AdminVoiceChannel>();
+        public static AdminVoiceChannel[] PredefinedChannels { get; set; } = new AdminVoiceChannel[]
+        {
+            new AdminVoiceChannel()
+        };
 
         public static HashSet<AdminVoiceChannel> CustomChannels { get; } = new HashSet<AdminVoiceChannel>();
 

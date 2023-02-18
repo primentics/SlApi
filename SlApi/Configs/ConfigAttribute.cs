@@ -17,13 +17,8 @@ namespace SlApi.Configs
         }
 
         public string GetDescription()
-        {
-            return _desc;
-        }
-
+            => _desc;
         public string GetName()
-        {
-            return _name;
-        }
+            => _name;
     }
 }

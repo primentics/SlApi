@@ -9,6 +9,21 @@ namespace SlApi.Events.CustomHandlers
         private Action<object[]> _cachedAction;
         private ServerEventType _type;
 
+        public override string DelegateName
+        {
+            get
+            {
+                if (_cachedAction != null)
+                {
+                    return $"{_cachedAction.Method.DeclaringType.FullName}::{_cachedAction.Method.Name}";
+                }
+                else
+                {
+                    return $"Unknown - {_type}";
+                }
+            }
+        }
+
         public GenericHandler(ServerEventType type, Action<object[]> action)
         {
             _type = type;

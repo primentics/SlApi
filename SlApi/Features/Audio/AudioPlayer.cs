@@ -22,6 +22,7 @@ using YoutubeSearch;
 using System.Linq;
 
 using SlApi.Extensions;
+using SlApi.Dummies;
 
 namespace SlApi.Audio
 {
@@ -33,9 +34,7 @@ namespace SlApi.Audio
         public const int EncodeBufferSize = 512;
         public const int MaxPlaybackSize = 480;
 
-        public static readonly HashSet<int> BlacklistedSelf = new HashSet<int>();
-
-        private static readonly YoutubeSearch.VideoSearch _search = new YoutubeSearch.VideoSearch();
+        private static readonly VideoSearch _search = new VideoSearch();
         private static readonly YoutubeClient _yt = new YoutubeClient();
         private static readonly HashSet<AudioPlayer> _allPlayers = new HashSet<AudioPlayer>();
 
@@ -62,30 +61,28 @@ namespace SlApi.Audio
 
         public Video Track;
         public ReferenceHub Owner;
+        public DummyPlayer Player;
+        public ReferenceHub CurrentCommand;
 
         public AudioSettings AudioSettings = new AudioSettings
         {
-            Channel = VoiceChatChannel.Proximity,
             Loop = false,
             Play = true,
             Volume = 100f
         };
-
-        public readonly HashSet<int> Whitelisted = new HashSet<int>();
-        public readonly HashSet<int> Blacklisted = new HashSet<int>();
 
         public void Start()
         {
             _allPlayers.Add(this);
         }
 
-        public void TryPlay(string url, AudioCommandChannel cmd)
+        public void TryPlay(string url)
         {
             if (Track != null)
             {
                 _requestQueue.Enqueue(url);
 
-                cmd.Write($"Request queued: {url}");
+                WriteCommand($"Request queued: {url}");
 
                 return;
             }
@@ -93,24 +90,24 @@ namespace SlApi.Audio
             if (_playbackCoroutine.IsValid)
                 Timing.KillCoroutines(_playbackCoroutine);
 
-            _playbackCoroutine = Timing.RunCoroutine(Playback(url, cmd), Segment.FixedUpdate);
+            _playbackCoroutine = Timing.RunCoroutine(Playback(url), Segment.FixedUpdate);
 
-            cmd.Write($"Attempting to play your request ..");
+            WriteCommand($"Attempting to play your request ..");
         }
 
-        public void Search(string query, AudioCommandChannel cmd)
+        public void Search(string query)
         {
-            Timing.RunCoroutine(SearchDelay(query, cmd));
+            Timing.RunCoroutine(SearchDelay(query));
         }
 
-        public void TryPlay(Video track, AudioCommandChannel cmd)
+        public void TryPlay(Video track)
         {
             if (_playbackCoroutine.IsValid)
                 Timing.KillCoroutines(_playbackCoroutine);
 
             Track = track;
 
-            _playbackCoroutine = Timing.RunCoroutine(Playback(null, cmd), Segment.FixedUpdate);
+            _playbackCoroutine = Timing.RunCoroutine(Playback(null), Segment.FixedUpdate);
         }
 
         public void OnDestroy()
@@ -120,6 +117,12 @@ namespace SlApi.Audio
             _allPlayers.Remove(this);
 
             Timing.KillCoroutines(_playbackCoroutine);
+
+            Player.Destroy();
+            Player = null;
+            Owner = null;
+            Track = null;
+            CurrentCommand = null;
         }
 
         public void Stop(bool clear = false)
@@ -136,30 +139,30 @@ namespace SlApi.Audio
                 ClearQueue();
         }
 
-        public void Pause(AudioCommandChannel cmd)
+        public void Pause()
         {
             AudioSettings.Play = false;
 
-            cmd.Write($"Paused.");
+            WriteCommand($"Paused.");
         }
 
-        public void Resume(AudioCommandChannel cmd)
+        public void Resume()
         {
             AudioSettings.Play = true;
 
-            cmd.Write("Resumed.");
+            WriteCommand("Resumed.");
         }
 
-        public void Skip(AudioCommandChannel cmd)
+        public void Skip()
         {
             Stop();
 
             if (_trackQueue.TryDequeue(out var track))
-                TryPlay(track, cmd);
+                TryPlay(track);
             else if (_requestQueue.TryDequeue(out var url))
-                TryPlay(url, cmd);
+                TryPlay(url);
 
-            cmd.Write("Skipped.");
+            WriteCommand("Skipped.");
         }
 
         public void ClearQueue()
@@ -168,9 +171,9 @@ namespace SlApi.Audio
                 continue;
         }
 
-        private IEnumerator<float> SearchDelay(string query, AudioCommandChannel cmd)
+        private IEnumerator<float> SearchDelay(string query)
         {
-            cmd.Write($"Searching for: {query} ..");
+            WriteCommand($"Searching for: {query} ..");
 
             var searchTask = new TaskResult<List<VideoInformation>>();
 
@@ -180,10 +183,10 @@ namespace SlApi.Audio
 
             if (!searchTask.IsSuccesfull)
             {
-                cmd.Write($"Search failed.");
+                WriteCommand($"Search failed.");
 
                 if (searchTask.Error != null)
-                    cmd.Write($"{searchTask.Error.Message}");
+                    WriteCommand($"{searchTask.Error.Message}");
 
                 yield break;
             }
@@ -192,26 +195,26 @@ namespace SlApi.Audio
 
             if (vid == null)
             {
-                cmd.Write("Search failed: No results.");
+                WriteCommand("Search failed: No results.");
 
                 yield break;
             }
 
-            TryPlay(vid.Url, cmd);
+            TryPlay(vid.Url);
         }
 
-        private IEnumerator<float> Playback(string url, AudioCommandChannel cmd)
+        private IEnumerator<float> Playback(string url)
         {
             _stop = false;
             AudioSettings.Play = true;
 
             if (Track is null)
             {
-                cmd.Write($"Searching: {url}");
+                WriteCommand($"Searching: {url}");
 
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 {
-                    cmd.Write($"Failed to create a valid URL!");
+                    WriteCommand($"Failed to create a valid URL!");
                     yield break;
                 }
 
@@ -223,7 +226,7 @@ namespace SlApi.Audio
 
                 if (!searchTask.IsSuccesfull || searchTask.Result == null)
                 {
-                    cmd.Write("Search failed!");
+                    WriteCommand("Search failed!");
                     yield break;
                 }
 
@@ -237,7 +240,7 @@ namespace SlApi.Audio
                 _trackQueue.Enqueue(Track);
             }
 
-            cmd.Write($"Retrived video: {Track.Title} (by {Track.Author.ChannelTitle})");
+            WriteCommand($"Retrived video: {Track.Title} (by {Track.Author.ChannelTitle})");
 
             var manifestTask = new TaskResult<StreamManifest>();
 
@@ -247,7 +250,7 @@ namespace SlApi.Audio
 
             if (!manifestTask.IsSuccesfull)
             {
-                cmd.Write($"Failed to retrieve the video's manifest!");
+                WriteCommand($"Failed to retrieve the video's manifest!");
                 yield break;
             }
 
@@ -255,7 +258,7 @@ namespace SlApi.Audio
 
             if (audioStream == null)
             {
-                cmd.Write("Failed to retrieve an audio stream!");
+                WriteCommand("Failed to retrieve an audio stream!");
                 yield break;
             }
 
@@ -267,11 +270,11 @@ namespace SlApi.Audio
 
             if (!streamTask.IsSuccesfull)
             {
-                cmd.Write($"Failed to retrieve audio stream data!");
+                WriteCommand($"Failed to retrieve audio stream data!");
                 yield break;
             }
 
-            cmd.Write("Downloading your audio ..");
+            WriteCommand("Downloading your audio ..");
 
             var sourceStream = streamTask.Result;
             var destinationStream = new MemoryStream();
@@ -298,7 +301,7 @@ namespace SlApi.Audio
             destinationStream.Dispose();
             sourceStream.Dispose();
 
-            cmd.Write("Audio downloaded, converting. This might take a minute.");
+            WriteCommand("Audio downloaded, converting. This might take a minute.");
 
             var ffmpeg = new AudioConverter();
 
@@ -308,7 +311,7 @@ namespace SlApi.Audio
             }
             catch (Exception ex)
             {
-                cmd.Write(ex);
+                WriteCommand(ex);
 
                 yield break;
             }
@@ -317,15 +320,15 @@ namespace SlApi.Audio
 
             if (!ffmpeg.OggResult.IsSuccesfull)
             {
-                cmd.Write("Failed to convert the audio file!");
+                WriteCommand("Failed to convert the audio file!");
 
                 if (ffmpeg.OggResult.Error != null)
-                    cmd.Write(ffmpeg.OggResult.Error);
+                    WriteCommand(ffmpeg.OggResult.Error);
 
                 yield break;
             }
 
-            cmd.Write("Audio file converted.");
+            WriteCommand("Audio file converted.");
 
             _playbackStream = new MemoryStream(ffmpeg.OggResult.Result);
             _playbackStream.Seek(0, SeekOrigin.Begin);
@@ -333,7 +336,7 @@ namespace SlApi.Audio
 
             if (_reader.Channels > VoiceChatSettings.Channels)
             {
-                cmd.Write("Failed: audio must be mono!");
+                WriteCommand("Failed: audio must be mono!");
 
                 _reader.Dispose();
                 _playbackStream.Dispose();
@@ -343,7 +346,7 @@ namespace SlApi.Audio
 
             if (_reader.SampleRate != VoiceChatSettings.SampleRate)
             {
-                cmd.Write("Failed: sample rate must be 48 000");
+                WriteCommand("Failed: sample rate must be 48 000");
 
                 _reader.Dispose();
                 _playbackStream.Dispose();
@@ -351,7 +354,7 @@ namespace SlApi.Audio
                 yield break;
             }
 
-            cmd.Write($"Playing: {Track.Title} (by {Track.Author.ChannelTitle})");
+            WriteCommand($"Playing: {Track.Title} (by {Track.Author.ChannelTitle})");
 
             _sampsPerSec = VoiceChatSettings.SampleRate * VoiceChatSettings.Channels;
             _sendBuffer = new float[_sampsPerSec / 5 + HeadSamples];
@@ -382,9 +385,9 @@ namespace SlApi.Audio
             Track = null;
 
             if (_trackQueue.TryDequeue(out var track))
-                TryPlay(track, cmd);
+                TryPlay(track);
             else if (_requestQueue.TryDequeue(out var reqUrl))
-                TryPlay(reqUrl, cmd);
+                TryPlay(reqUrl);
         }
 
         public void Update()
@@ -415,33 +418,7 @@ namespace SlApi.Audio
 
                 int dataLen = _encoder.Encode(_sendBuffer, _encodeBuffer, MaxPlaybackSize);
 
-                foreach (var plr in ReferenceHub.AllHubs)
-                {
-                    if (plr.Mode != ClientInstanceMode.ReadyClient)
-                        continue;
-
-                    if (plr.connectionToClient is null)
-                        continue;
-
-                    if (Blacklisted.Contains(plr.GetInstanceID()))
-                        continue;
-
-                    if (Whitelisted.Count > 0 && !Whitelisted.Contains(plr.GetInstanceID()))
-                        continue;
-
-                    if (plr.GetInstanceID() == Owner.GetInstanceID())
-                        continue;
-
-                    if (BlacklistedSelf.Contains(plr.GetInstanceID()) && plr.GetInstanceID() != Owner.GetInstanceID())
-                        continue;
-
-                    plr.connectionToClient.Send(new VoiceMessage(
-                        Owner,
-                        AudioSettings.Channel,
-                        _encodeBuffer,
-                        dataLen,
-                        false));
-                }
+                Player?.Speak(_encodeBuffer, dataLen);
             }
         }
 
@@ -449,6 +426,8 @@ namespace SlApi.Audio
         {
             foreach (var player in _allPlayers)
                 UnityEngine.Object.Destroy(player);
+
+            _allPlayers.Clear();
         }
 
         public static AudioPlayer GetPlayer(ReferenceHub hub)
@@ -460,9 +439,32 @@ namespace SlApi.Audio
             {
                 player = owner.gameObject.AddComponent<AudioPlayer>();
                 player.Owner = owner;
+                player.Player = new DummyPlayer(owner);
+                player.Player.VoiceChannel = VoiceChatChannel.Proximity;
+
+                Timing.CallDelayed(0.3f, () =>
+                {
+                    player.Player.RoleId = owner.roleManager.CurrentRole.RoleTypeId;
+                    player.Player.Position = owner.GetRealPosition();
+                    player.Player.Rotation = owner.GetRealRotation();
+                });
             }
 
             return player;
+        }
+
+        private void WriteCommand(object message)
+        {
+            if (CurrentCommand != null)
+            {
+                CurrentCommand.ConsoleMessage($"[Audio Player] {message}", "red");
+                CurrentCommand.queryProcessor.TargetReply(
+                    CurrentCommand.connectionToClient,
+                    $"[Audio Player] {message}",
+                    true,
+                    false,
+                    "");
+            }
         }
     }
 }

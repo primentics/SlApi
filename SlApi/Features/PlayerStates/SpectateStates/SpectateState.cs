@@ -76,6 +76,9 @@ namespace SlApi.Features.PlayerStates.SpectateStates
             if (Flags is SpectateFlags.ByAnyone)
                 return true;
 
+            if (Flags is SpectateFlags.ByNoOne)
+                return false;
+
             return spectator.serverRoles.RemoteAdmin;
         }
     }

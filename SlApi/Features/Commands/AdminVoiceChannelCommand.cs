@@ -20,12 +20,12 @@ namespace SlApi.Commands
 		{
 			if (arguments.Count != 2)
 			{
-				response = $"Missing arguments! adminvoicechannel <target> <id>\n\nActive channels:";
+				response = $"Missing arguments! adminvoicechannel <target> <id>\n\nActive channels:\n";
 
 				foreach (var cchannel in AdminVoiceProcessor.CustomChannels)
 					response += $"	- [{cchannel.Id}] {cchannel.Name} ({cchannel.VoiceChannel})\n";
 
-				response += "\nPredefined channels:";
+				response += "\nPredefined channels:\n";
 
 				foreach (var cchannel in AdminVoiceProcessor.PredefinedChannels)
                     response += $"	- [{cchannel.Id}] {cchannel.Name} ({cchannel.VoiceChannel})\n";
@@ -54,17 +54,17 @@ namespace SlApi.Commands
 			}
 
 			if (!player.TryGetState<AdminVoiceState>(out var adminVoiceState))
-				player.TryAddState((adminVoiceState = new AdminVoiceState(player)));
+				player.TryAddState(adminVoiceState = new AdminVoiceState(player));
 
 			if (adminVoiceState.CurrentChannel.HasValue && adminVoiceState.CurrentChannel.Value == channelId)
 			{
-				adminVoiceState.CurrentChannel = null;
+				adminVoiceState.DeclineFromChannel(channelId);
 				response = $"You were removed from {channelId}.";
 				return true;
 			}
 			else
 			{
-				adminVoiceState.CurrentChannel = channelId;
+				adminVoiceState.AllowToChannel(channelId);
 				response = $"You were added to {channelId}.";
 				return true;
 			}

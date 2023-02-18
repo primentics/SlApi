@@ -43,7 +43,7 @@ namespace SlApi.Features.PlayerStates.RocketStates
 
         public override void OnAdded()
         {
-            _basePos = Target.GetRealPosition();
+            _basePos = Target.transform.position;
             _maxY = _basePos.y * HeightMultiplier;
         }
 

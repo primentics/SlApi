@@ -1,4 +1,5 @@
 ﻿using PlayerRoles;
+using PlayerRoles.Spectating;
 using PlayerRoles.Voice;
 
 using SlApi.Extensions;
@@ -25,21 +26,30 @@ namespace SlApi.Features.Voice.Custom
 
         public bool CanBeHeardBy(ReferenceHub receiver)
         {
-            if (receiver.Mode != ClientInstanceMode.ReadyClient)
+            if (receiver.netId == Target.netId
+                && !Channel.Flags.Contains(CustomVoiceFlags.CanHearSelf))
+            {
                 return false;
+            }
 
-            if (!(receiver.roleManager.CurrentRole is IVoiceRole))
+            if (VcChannel is VoiceChatChannel.ScpChat && !receiver.IsSCP())
+            {
                 return false;
+            }
 
-            if (!Channel.Flags.Contains(CustomVoiceFlags.CanHearSelf) && receiver.netId == Target.netId)
-                return false;
+            if (receiver.roleManager.CurrentRole.RoleTypeId is RoleTypeId.Spectator && Target.IsSpectatedBy(receiver))
+            {
+                return true;
+            }
 
-            if (Target.IsSCP() && receiver.IsSCP() && VcChannel is VoiceChatChannel.Proximity)
+            if (Target.IsSCP() && !receiver.IsSCP() && VcChannel is VoiceChatChannel.Proximity)
             {
                 if (Channel.Flags.Contains(CustomVoiceFlags.PerformScpProximityCheck))
                 {
                     if (Vector3.Distance(Target.GetRealPosition(), receiver.GetRealPosition()) > Channel.MaxScpProximity)
+                    {
                         return false;
+                    }
                 }
             }
 
@@ -47,7 +57,10 @@ namespace SlApi.Features.Voice.Custom
         }
 
         public bool IsEnabled()
-            => Channel != null && VcChannel != VoiceChatChannel.None && !DefaultState;
+            => 
+               Channel != null 
+            && VcChannel != VoiceChatChannel.None
+            && !DefaultState;
 
         public void OnKeyUsed()
         {

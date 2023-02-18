@@ -3,7 +3,6 @@
 using PluginAPI.Core;
 
 using SlApi.Audio;
-using SlApi.Dummies;
 using SlApi.Extensions;
 
 using System;
@@ -63,16 +62,7 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        if (arguments.Count >= 2 && bool.TryParse(arguments.At(1), out var useSelf) && useSelf)
-                            player = AudioPlayer.GetOrCreatePlayer(sender);
-                        else
-                        {
-                            var dummy = DummyPlayer.GetOrCreateDummy(sender, true);
-
-                            dummy.Owner = sender;
-
-                            player = AudioPlayer.GetOrCreatePlayer(dummy.Hub);
-                        }
+                        player = AudioPlayer.GetOrCreatePlayer(sender);
 
                         response = "Player spawned.";
                         return true;
@@ -87,9 +77,6 @@ namespace SlApi.Commands
                         }
 
                         UnityEngine.Object.Destroy(player);
-
-                        if (DummyPlayer.TryGetDummyByOwner(sender, out var dummy))
-                            dummy.Destroy();
 
                         response = "Player despawned.";
                         return true;
@@ -119,7 +106,7 @@ namespace SlApi.Commands
                                         return false;
                                     }
 
-                                    player.AudioSettings.Channel = channel;
+                                    player.Player.VoiceChannel = channel;
 
                                     response = $"Channel set to {channel}";
                                     return true;
@@ -147,21 +134,14 @@ namespace SlApi.Commands
                                         return false;
                                     }
 
-                                    if (!DummyPlayer.TryGetDummyByOwner(sender, out var dummy))
-                                    {
-                                        response = "You do not have an active dummy.";
-                                        return false;
-                                    }
-
                                     if (!HubExtensions.TryGetHub(arguments.At(2), out var hub))
                                     {
                                         response = "Stopped following.";
-                                        dummy.Follow = null;
+                                        player.Player.Follow(null);
                                         return false;
                                     }
 
-                                    dummy.Owner = sender;
-                                    dummy.Follow = hub;
+                                    player.Player.Follow(hub);
 
                                     response = $"Following {hub.nicknameSync.MyNick}";
                                     return true;
@@ -175,15 +155,9 @@ namespace SlApi.Commands
                                         return false;
                                     }
 
-                                    if (!DummyPlayer.TryGetDummyByOwner(sender, out var dummy))
-                                    {
-                                        response = "You do not have an active dummy.";
-                                        return false;
-                                    }
-
                                     string nick = string.Join(" ", arguments.Skip(2));
 
-                                    dummy.Nick = nick;
+                                    player.Player.NickName = nick;
 
                                     response = $"Nick set to {nick}";
                                     return true;
@@ -213,7 +187,8 @@ namespace SlApi.Commands
 
                         string query = string.Join(" ", arguments.Skip(1));
 
-                        player.Search(query, new AudioCommandChannel(sender));
+                        player.CurrentCommand = sender;
+                        player.Search(query);
 
                         response = "";
                         return true;
@@ -235,7 +210,8 @@ namespace SlApi.Commands
 
                         string url = arguments.At(1);
 
-                        player.TryPlay(url, new AudioCommandChannel(sender));
+                        player.CurrentCommand = sender;
+                        player.TryPlay(url);
 
                         response = "";
                         return true;
@@ -249,7 +225,8 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        player.Pause(new AudioCommandChannel(sender));
+                        player.CurrentCommand = sender;
+                        player.Pause();
 
                         response = "";
                         return true;
@@ -263,7 +240,8 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        player.Resume(new AudioCommandChannel(sender));
+                        player.CurrentCommand = sender;
+                        player.Resume();
                         
                         response = "";
                         return true;
@@ -277,6 +255,7 @@ namespace SlApi.Commands
                             return false;
                         }
 
+                        player.CurrentCommand = sender;
                         player.Stop(true);
 
                         response = "Stopped.";
@@ -291,6 +270,7 @@ namespace SlApi.Commands
                             return false;
                         }
 
+                        player.CurrentCommand = sender;
                         player.ClearQueue();
 
                         response = "Queue cleared.";
@@ -305,7 +285,8 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        player.Skip(new AudioCommandChannel(sender));
+                        player.CurrentCommand = sender;
+                        player.Skip();
 
                         response = "";
                         return true;
@@ -331,80 +312,6 @@ namespace SlApi.Commands
                             player.AudioSettings.Loop = true;
 
                             response = "Loop enabled.";
-                            return true;
-                        }
-                    }
-
-                case "wh":
-                case "whitelist":
-                    {
-                        if (arguments.Count < 2)
-                        {
-                            response = "Missing arguments! audio whitelist <player>";
-                            return false;
-                        }
-
-                        if (!TryGetPlayer(sender, out var player))
-                        {
-                            response = "You don't own a player!";
-                            return false;
-                        }
-
-                        if (!HubExtensions.TryGetHub(arguments.At(1), out var hub))
-                        {
-                            response = "Failed to find your target.";
-                            return false;
-                        }
-
-                        if (player.Whitelisted.Contains(hub.GetInstanceID()))
-                        {
-                            player.Whitelisted.Remove(hub.GetInstanceID());
-
-                            response = $"{hub.nicknameSync.Network_myNickSync} removed from whitelist.";
-                            return true;
-                        }
-                        else
-                        {
-                            player.Whitelisted.Add(hub.GetInstanceID());
-
-                            response = $"{hub.nicknameSync.Network_myNickSync} added to whitelist.";
-                            return true;
-                        }
-                    }
-
-                case "bh":
-                case "blacklist":
-                    {
-                        if (arguments.Count < 2)
-                        {
-                            response = "Missing arguments! audio blacklist <player>";
-                            return false;
-                        }
-
-                        if (!TryGetPlayer(sender, out var player))
-                        {
-                            response = "You don't own a player!";
-                            return false;
-                        }
-
-                        if (!HubExtensions.TryGetHub(arguments.At(1), out var hub))
-                        {
-                            response = "Failed to find your target.";
-                            return false;
-                        }
-
-                        if (player.Blacklisted.Contains(hub.GetInstanceID()))
-                        {
-                            player.Blacklisted.Remove(hub.GetInstanceID());
-
-                            response = $"{hub.nicknameSync.Network_myNickSync} removed from blacklist.";
-                            return true;
-                        }
-                        else
-                        {
-                            player.Blacklisted.Add(hub.GetInstanceID());
-
-                            response = $"{hub.nicknameSync.Network_myNickSync} added to blacklist.";
                             return true;
                         }
                     }
@@ -435,15 +342,15 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        if (!DummyPlayer.TryGetDummyByOwner(sender, out var dummy))
+                        if (!TryGetPlayer(sender, out var player))
                         {
                             response = "You don't have an active dummy.";
                             return false;
                         }
 
-                        dummy.Scale = new Vector3(x, y, z);
+                        player.Player.Scale = new Vector3(x, y, z);
 
-                        response = $"Dummy scaled to {dummy.Scale.ToPreciseString()}";
+                        response = $"Dummy scaled to {player.Player.Scale.ToPreciseString()}";
                         return true;
                     }
             }
@@ -454,14 +361,7 @@ namespace SlApi.Commands
 
         public static bool TryGetPlayer(ReferenceHub hub, out AudioPlayer player)
         {
-            if (DummyPlayer.TryGetDummyByOwner(hub, out var dummy))
-            {
-                player = AudioPlayer.GetPlayer(dummy.Hub);
-            }
-            else
-            {
-                player = AudioPlayer.GetPlayer(hub);
-            }
+            player = AudioPlayer.GetPlayer(hub);
 
             return player != null;
         }

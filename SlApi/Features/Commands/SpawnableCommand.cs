@@ -24,6 +24,38 @@ namespace SlApi.Commands
         public string[] Aliases { get; } = new string[] { "spawna", "spa" };
         public string Description { get; } = "Provides access to spawnable objects.";
 
+        public static HashSet<GameObject> GetPrefabs()
+        {
+            var set = new HashSet<GameObject>(NetworkManager.singleton.spawnPrefabs);
+
+            foreach (var ragdollPrefab in RagdollManager.CachedRagdollPrefabs)
+            {
+                if (!set.Any(x => x.name == ragdollPrefab.name))
+                    set.Add(ragdollPrefab.gameObject);
+            }
+
+            foreach (var prefab in NetworkClient.prefabs.Select(x => x.Value))
+            {
+                if (!set.Any(x => x.name == prefab.name))
+                    set.Add(prefab.gameObject);
+            }
+
+            if (Round.IsRoundStarted)
+            {
+                var elevatorManager = UnityEngine.Object.FindObjectOfType<ElevatorManager>();
+
+                foreach (var chamber in ElevatorManager.SpawnedChambers)
+                {
+                    var prefab = elevatorManager.GetChamberForGroup(chamber.Key);
+
+                    if (prefab != null && !set.Any(x => x.name == prefab.name))
+                        set.Add(prefab.gameObject);
+                }
+            }
+
+            return set;
+        }
+
         public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)
         {
             Player senderPly = Player.Get(sender);
@@ -44,25 +76,7 @@ namespace SlApi.Commands
             {
                 case "list":
                     var builder = new StringBuilder();
-                    var objs = new List<GameObject>(NetworkManager.singleton.spawnPrefabs);
-
-                    objs.AddRange(RagdollManager.CachedRagdollPrefabs.Select(x => x.gameObject));
-                    objs.AddRange(NetworkClient.prefabs.Select(x => x.Value));
-
-                    if (Round.IsRoundStarted)
-                    {
-                        objs.Add(BreakableDoor.AllDoors.First().As<BreakableDoor>()._brokenPrefab.gameObject);
-
-                        foreach (var pair in ElevatorManager.SpawnedChambers)
-                        {
-                            var prefab = ElevatorManager.FindObjectOfType<ElevatorManager>().GetChamberForGroup(pair.Key);
-
-                            if (prefab != null)
-                            {
-                                objs.Add(prefab.gameObject);
-                            }
-                        }
-                    }
+                    var objs = GetPrefabs();
 
                     builder.AppendLine($"Spawnable objects ({objs.Count})");
 
@@ -82,7 +96,7 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        var obj = NetworkManager.singleton.spawnPrefabs.FirstOrDefault(x => x.name == string.Join(" ", arguments.Skip(1)));
+                        var obj = GetPrefabs().FirstOrDefault(x => x.name == string.Join(" ", arguments.Skip(1)));
 
                         if (obj is null)
                         {
@@ -91,6 +105,9 @@ namespace SlApi.Commands
                         }
 
                         var copy = UnityEngine.Object.Instantiate(obj);
+
+                        copy.transform.position = senderPly.Position;
+                        copy.transform.rotation = Quaternion.Euler(senderPly.Rotation);
 
                         NetworkServer.Spawn(copy);
 

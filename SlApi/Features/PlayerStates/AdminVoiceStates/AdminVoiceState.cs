@@ -15,6 +15,8 @@ namespace SlApi.Features.PlayerStates.AdminVoiceStates
                 || ((target.serverRoles.RaEverywhere || target.serverRoles.Staff) && AdminVoiceProcessor.IncludeNwStaff)) 
                 ? AdminVoiceFlags.GlobalAllowed 
                 : AdminVoiceFlags.None;
+
+            CurrentChannel = null;
         }
 
         public void AllowToChannel(byte channelId)

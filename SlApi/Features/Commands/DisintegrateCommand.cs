@@ -20,6 +20,8 @@ using SlApi.Configs;
 using SlApi.Extensions;
 
 using AdminToys;
+using PlayerRoles.PlayableScps.Scp079.Cameras;
+using PlayerRoles.PlayableScps.Scp079;
 
 namespace SlApi.Commands
 {
@@ -59,17 +61,7 @@ namespace SlApi.Commands
 
         public static void PerformRaycast(ReferenceHub hub)
         {
-            LayerMask mask = LayerMask.GetMask(new string[]
-            {
-                "Default",
-                "Hitbox",
-                "CCTV",
-                "Door",
-                "Locker",
-                "Pickup"
-            });
-
-            if (!Physics.Raycast(hub.PlayerCameraReference.position, hub.PlayerCameraReference.forward, out var hit, MaxDistance, mask))
+            if (!Physics.Raycast(hub.PlayerCameraReference.position, hub.PlayerCameraReference.forward, out var hit, MaxDistance, Physics.AllLayers))
                 return;
 
             NetworkUtils.SendDisruptorHitMessage(hit.transform.position, Quaternion.LookRotation(-hit.normal));
@@ -175,6 +167,34 @@ namespace SlApi.Commands
             if (window != null)
             {
                 NetworkServer.Destroy(window.gameObject);
+                return;
+            }
+
+            var camera = hit.transform.gameObject.GetComponentInParent<Scp079Camera>();
+
+            if (camera != null)
+            {
+                NetworkServer.Destroy(camera.gameObject);
+                return;
+            }
+
+            var speaker = hit.transform.gameObject.GetComponentInParent<Scp079Speaker>();
+
+            if (speaker != null)
+            {
+                NetworkServer.Destroy(speaker.gameObject);
+                return;
+            }
+
+            if (hit.transform.TryGetComponent(out NetworkTransform networkTransform))
+            {
+                NetworkServer.Destroy(networkTransform.gameObject);
+                return;
+            }
+
+            if (hit.transform.TryGetComponent(out NetworkIdentity identity))
+            {
+                NetworkServer.Destroy(identity.gameObject.transform.parent.gameObject);
                 return;
             }
         }

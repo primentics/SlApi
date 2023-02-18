@@ -1,4 +1,10 @@
-﻿using SlApi.Extensions;
+﻿using AzyWorks.Utilities;
+
+using PluginAPI.Core;
+
+using SlApi.Events;
+using SlApi.Events.CustomHandlers;
+using SlApi.Extensions;
 
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +20,10 @@ namespace SlApi.Features.PlayerStates
         static PlayerStateController()
         {
             StaticUnityMethods.OnUpdate += OnUpdate;
+
+            EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.PlayerSpawn, OnRoleChanged));
+            EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.PlayerLeft, OnPlayerLeft));
+            EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.PlayerDying, OnDied));
         }
 
         public static PlayerStateBase[] GetPlayerStates(this ReferenceHub hub)
@@ -69,6 +79,7 @@ namespace SlApi.Features.PlayerStates
                 ActiveStates.Add(state);
                 state.OnAdded();
                 hub.ConsoleMessage($"[PlayerStateController] Assigned state {typeof(T).FullName}");
+                SetActive<T>(hub, true);
                 return true;
             }
 
@@ -90,15 +101,84 @@ namespace SlApi.Features.PlayerStates
             return false;
         }
 
+        private static void OnPlayerLeft(object[] args)
+        {
+            var hub = args[0].As<Player>().ReferenceHub;
+
+            lock (ActiveStates)
+            {
+                for (int i = 0; i < ActiveStates.Count; i++)
+                {
+                    var item = ActiveStates.ElementAt(i);
+
+                    if (item.Target == hub)
+                        ActiveStates.RemoveAt(i);
+                }
+            }
+        }
+
+        private static void OnRoleChanged(object[] args)
+        {
+            var hub = args[0].As<Player>().ReferenceHub;
+
+            lock (ActiveStates)
+            {
+                for (int i = 0; i < ActiveStates.Count; i++)
+                {
+                    var state = ActiveStates.ElementAt(i);
+
+                    if (state.Target == hub)
+                    {
+                        state.OnRoleChanged();
+
+                        if (state.ShouldClearOnRoleChange())
+                        {
+                            state.DisposeState();
+
+                            ActiveStates.RemoveAt(i);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void OnDied(object[] args)
+        {
+            var hub = args[0].As<Player>().ReferenceHub;
+
+            lock (ActiveStates)
+            {
+                for (int i = 0; i < ActiveStates.Count; i++)
+                {
+                    var state = ActiveStates.ElementAt(i);
+
+                    if (state.Target == hub)
+                    {
+                        state.OnDied();
+
+                        if (state.ShouldClearOnDeath())
+                        {
+                            state.DisposeState();
+
+                            ActiveStates.Remove(state);
+                        }
+                    }
+                }
+            }
+        }
+
         private static void OnUpdate()
         {
             if (!EnableUpdate)
                 return;
 
-            for (int i = 0; i < ActiveStates.Count; i++)
+            lock (ActiveStates)
             {
-                if (ActiveStates[i].CanUpdateState() && ActiveStates[i].IsActive)
-                    ActiveStates[i].UpdateState();
+                foreach (var state in ActiveStates)
+                {
+                    if (state.CanUpdateState() && state.IsActive)
+                        state.UpdateState();
+                }
             }
         }
     }

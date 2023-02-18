@@ -6,7 +6,7 @@ namespace SlApi.Features.Voice.AdminVoice
     {
         public byte Id { get; set; } = 0;
 
-        public string Name { get; set; } = "Example";
+        public string Name { get; set; } = "example";
 
         public VoiceChatChannel VoiceChannel { get; set; } = VoiceChatChannel.Intercom;
     }

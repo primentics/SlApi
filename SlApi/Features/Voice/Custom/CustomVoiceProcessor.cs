@@ -2,7 +2,13 @@
 
 using PlayerRoles;
 
+using PluginAPI.Core;
+
 using SlApi.Configs;
+using SlApi.Events;
+using SlApi.Events.CustomHandlers;
+using SlApi.Features.PlayerStates;
+using SlApi.Features.PlayerStates.AdminVoiceStates;
 using SlApi.Features.Voice.Custom;
 
 using System.Collections.Generic;
@@ -12,6 +18,11 @@ namespace SlApi.Features.Voice
 {
     public static class CustomVoiceProcessor
     {
+        static CustomVoiceProcessor()
+        {
+            EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.PlayerJoined, OnPlayerJoined));
+        }
+
         [Config("CustomVoice.PairedChannels", "A list of roles paired to their channel IDs.")]
         public static Dictionary<RoleTypeId, byte> PairedChannels { get; set; } = new Dictionary<RoleTypeId, byte>()
         {
@@ -23,7 +34,7 @@ namespace SlApi.Features.Voice
 
         public static bool TryGetChannelById(byte channelId, out CustomVoiceChannel channel)
         {
-            channel = PredefinedChannels.FirstOrDefault(x => x.Id== channelId);
+            channel = PredefinedChannels.FirstOrDefault(x => x.Id == channelId);
 
             return channel != null;
         }
@@ -66,12 +77,20 @@ namespace SlApi.Features.Voice
                 foreach (var index in toRemove)
                     PairedChannels.Remove(PairedChannels.ElementAt(index).Key);
 
-                HashSetPool<int>.Shared.Return(toRemove);
-
                 return false;
             }
 
+            HashSetPool<int>.Shared.Return(toRemove);
+
             return true;
+        }
+
+        private static void OnPlayerJoined(object[] args)
+        {
+            var hub = (args[0] as Player).ReferenceHub;
+
+            hub.TryAddState(new CustomVoiceState(hub));
+            hub.TryAddState(new AdminVoiceState(hub));
         }
     }
 }

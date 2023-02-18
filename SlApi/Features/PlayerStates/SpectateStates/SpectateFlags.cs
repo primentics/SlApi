@@ -3,6 +3,7 @@
     public enum SpectateFlags
     {
         ByAnyone,
-        ByStaff
+        ByStaff,
+        ByNoOne
     }
 }

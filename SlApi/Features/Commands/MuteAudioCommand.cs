@@ -5,6 +5,7 @@ using PluginAPI.Core;
 using System;
 
 using SlApi.Audio;
+using SlApi.Dummies;
 
 namespace SlApi.Commands
 {
@@ -27,16 +28,16 @@ namespace SlApi.Commands
                 return false;
             }
 
-            if (AudioPlayer.BlacklistedSelf.Contains(player.ReferenceHub.GetInstanceID()))
+            if (DummyPlayer.IsMutedToGlobal(player.ReferenceHub))
             {
-                AudioPlayer.BlacklistedSelf.Remove(player.ReferenceHub.GetInstanceID());
+                DummyPlayer.UnmuteGlobal(player.ReferenceHub);
 
                 response = "Unmuted all audio.";
                 return true;
             }
             else
             {
-                AudioPlayer.BlacklistedSelf.Add(player.ReferenceHub.GetInstanceID());
+                DummyPlayer.MuteGlobal(player.ReferenceHub);
 
                 response = "Muted all audio.";
                 return true;

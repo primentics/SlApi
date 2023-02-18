@@ -4,232 +4,268 @@ using Mirror;
 
 using PlayerRoles;
 using PlayerRoles.FirstPersonControl;
-
+using SlApi.Extensions;
 using System.Collections.Generic;
 using System.Linq;
 
 using UnityEngine;
+using Utils.NonAllocLINQ;
+using VoiceChat;
+using VoiceChat.Networking;
 
 namespace SlApi.Dummies
 {
     public class DummyPlayer
     {
-        public static int IdIndex = 500;
-        public static HashSet<DummyPlayer> Dummies = new HashSet<DummyPlayer>();
+        public static HashSet<DummyPlayer> SpawnedDummies { get; } = new HashSet<DummyPlayer>();
 
-        public static GameObject PlayerPrefab { get => NetworkManager.singleton.playerPrefab; }
+        internal static HashSet<uint> MutedGlobal = new HashSet<uint>();
 
-        private Vector3 _lastPos;
-        private Vector3 _lastScale;
-        private Quaternion _lastRot;
+        private ReferenceHub _hub;
+        private ReferenceHub _owner;
+        private ReferenceHub _followedPlayer;
 
-        public ReferenceHub Owner { get; set; }
-        public ReferenceHub Hub { get; }
-        public NetworkConnection Connection { get; }
-        public GameObject Player { get; }
+        private HashSet<uint> _invisibleTo = new HashSet<uint>();
+        private HashSet<uint> _mutedTo = new HashSet<uint>();
 
-        public string Nick { get => Hub.nicknameSync.Network_myNickSync; set => Hub.nicknameSync.SetNick(value); }
+        public PlayerRoleBase Role { get => _hub.roleManager.CurrentRole; }
 
-        public bool InWorld { get; private set; }
-        public ReferenceHub Follow { get; set; }
+        public bool IsInZero { get => _hub.transform.position != Vector3.zero; }
 
         public RoleTypeId RoleId
         {
-            get => Hub.roleManager.CurrentRole?.RoleTypeId ?? RoleTypeId.None;
-            set
+            get
             {
-                if (value == RoleTypeId.None)
-                    Despawn();
-                else
-                {
-                    if (value == RoleId)
-                        return;
-
-                    Hub.roleManager.ServerSetRole(value, RoleChangeReason.RemoteAdmin);
-                }
+                return Role?.RoleTypeId ?? RoleTypeId.None;
             }
-        }
-
-        public PlayerRoleBase Role
-        {
-            get => Hub.roleManager.CurrentRole;
             set
             {
-                if (value == null)
-                    Despawn();
-                else
-                    RoleId = value.RoleTypeId;
+                if (value is RoleTypeId.None)
+                {
+                    Destroy();
+                    return;
+                }
+
+                _hub.roleManager.ServerSetRole(value, RoleChangeReason.RemoteAdmin, RoleSpawnFlags.AssignInventory);
             }
         }
 
         public Vector3 Position
         {
-            get => InWorld ? (Hub.roleManager.CurrentRole is IFpcRole fpcRole ? fpcRole.FpcModule.Position : Hub.transform.position) : _lastPos;
+            get
+            {
+                return _hub.GetRealPosition();
+            }
             set
             {
-                if (!(Role is IFpcRole fpcRole))
-                    return;
-
-                fpcRole.FpcModule.ServerOverridePosition(Position, Rotation.eulerAngles);
+                _hub.SetPosition(value);
             }
         }
 
         public Vector3 Scale
         {
-            get => InWorld ? (Hub.roleManager.CurrentRole is IFpcRole fpcRole ? fpcRole.FpcModule.CharacterModelInstance.transform.localScale : Hub.transform.localScale) : _lastScale;
+            get
+            {
+                return _hub.transform.localScale;
+            }
             set
             {
-                _lastScale = value;
+                _hub.Resize(value);
             }
         }
 
         public Quaternion Rotation
         {
-            get => InWorld ? (Hub.roleManager.CurrentRole is IFpcRole fpcRole ? fpcRole.FpcModule.MouseLook.TargetHubRotation : Hub.transform.rotation) : _lastRot;
+            get
+            {
+                return _hub.GetRealRotation();
+            }
             set
             {
-                if (!(Role is IFpcRole fpcRole))
-                    return;
-
-                fpcRole.FpcModule.MouseLook.CurrentHorizontal = value.x;
-                fpcRole.FpcModule.MouseLook.CurrentVertical = value.y;
-                fpcRole.FpcModule.MouseLook.UpdateRotation();
+                _hub.SetRotation(value);
             }
         }
 
-        public DummyPlayer(RoleTypeId role)
+        public string NickName
         {
-            Player = Object.Instantiate(PlayerPrefab);
-            Connection = new DummyNetworkConnecton(IdIndex++);
-            Hub = Player.GetComponent<ReferenceHub>();
-
-            NetworkServer.AddPlayerForConnection(Connection, Player);
-
-            Hub.characterClassManager._privUserId =  $"dummy-{Hub.GetInstanceID()}-{IdIndex}";
-            Hub.characterClassManager.NetworkSyncedUserId = "ID_Host";
-            Hub.Network_playerId = new RecyclablePlayerId(IdIndex);
-
-            Timing.CallDelayed(0.5f, () =>
+            get
             {
-                RoleId = role;
-            });
+                return _hub.nicknameSync.Network_myNickSync;
+            }
+            set
+            {
+                _hub.nicknameSync.Network_myNickSync = value;
+            }
+        }
 
-            Dummies.Add(this);
+        public string UserId
+        {
+            get
+            {
+                return _hub.characterClassManager.UserId2;
+            }
+            set
+            {
+                _hub.characterClassManager.UserId2 = value;
+            }
+        }
 
-            StaticUnityMethods.OnFixedUpdate += OnFixedUpdate;
+        public int Id
+        {
+            get
+            {
+                return _hub.PlayerId;
+            }
+            set
+            {
+                _hub.Network_playerId = new RecyclablePlayerId(value);
+            }
+        }
+
+        public bool IsInvisible { get; set; }
+
+        public VoiceChatChannel VoiceChannel { get; set; } = VoiceChatChannel.None;
+
+        public DummyPlayer(ReferenceHub owner = null)
+        {
+            _hub = InstantiatePlayer();
+            _owner = owner;
+
+            NetworkServer.AddPlayerForConnection(InstantiateConnection(_hub.PlayerId), _hub.gameObject);
         }
 
         public void Destroy()
         {
-            StaticUnityMethods.OnFixedUpdate -= OnFixedUpdate;
+            NetworkServer.Destroy(_hub.gameObject);
 
-            NetworkServer.Destroy(Player);
+            _hub = null;
+            _followedPlayer = null;
+            _owner = null;
 
-            Dummies.Remove(this);
+            SpawnedDummies.Remove(this);
         }
 
-        public void Spawn(Vector3 pos, Vector3 scale, Quaternion rot)
+        public bool IsInvisibleTo(uint plyId)
+            => _invisibleTo.Contains(plyId);
+
+        public bool IsFollowing(out ReferenceHub followed)
         {
-            _lastPos = pos;
-            _lastRot = rot;
-            _lastScale = scale;
-
-            InWorld = true;
-
-            Player.transform.rotation = rot;
-            Player.transform.position = pos;
-            Player.transform.localPosition = pos;
-            Player.transform.localRotation = rot;
-            Player.transform.localScale = scale;
-
-            NetworkServer.Spawn(Player);
-
-            Position = pos;
-            Rotation = rot;
+            followed = _followedPlayer;
+            return followed != null;
         }
 
-        public void Despawn()
+        public bool IsMutedTo(ReferenceHub hub)
+            => _mutedTo.Contains(hub.netId);
+
+        public void Mute(ReferenceHub hub)
+            => _mutedTo.Add(hub.netId);
+
+        public void Unmute(ReferenceHub hub)
+            => _mutedTo.Remove(hub.netId);
+
+        public static bool IsMutedToGlobal(ReferenceHub hub)
+            => MutedGlobal.Contains(hub.netId);
+
+        public static void MuteGlobal(ReferenceHub hub)
+            => MutedGlobal.Add(hub.netId);
+
+        public static void UnmuteGlobal(ReferenceHub hub)
+            => MutedGlobal.Remove(hub.netId);
+
+        public void Follow(ReferenceHub hub)
+            => _followedPlayer = hub;
+
+        public void Speak(byte[] data, int length)
+            => Speak(new VoiceMessage(_hub, VoiceChannel, data, length, false));
+
+        public void Speak(VoiceMessage voiceMessage)
         {
-            _lastRot = Rotation;
-            _lastPos = Position;
-            _lastScale = Scale;
+            if (VoiceChannel is VoiceChatChannel.None)
+                return;
 
-            InWorld = false;
+            if (voiceMessage.Speaker != _hub)
+                voiceMessage.Speaker = _hub;
 
-            NetworkServer.UnSpawn(Player);
-        }
+            if (voiceMessage.Channel != VoiceChannel)
+                voiceMessage.Channel = VoiceChannel;
 
-        private void OnFixedUpdate()
-        {
-            if (Follow != null && Follow.IsAlive() && (Follow.roleManager.CurrentRole is IFpcRole fpcRole))
+            foreach (var hub in ReferenceHub.AllHubs)
             {
-                Position = Follow.transform.TransformPoint(new Vector3(0f, 0.5f, -5f));
-                
-                var rot = Quaternion.LookRotation(Hub.transform.forward, Hub.transform.up);
+                if (hub == _hub)
+                    continue;
 
-                rot.SetLookRotation(fpcRole.FpcModule.Position);
+                if (hub.Mode != ClientInstanceMode.ReadyClient)
+                    continue;
 
-                Rotation = rot;
-            }
-        }
-
-        public static bool TryGetDummyByOwner(ReferenceHub owner, out DummyPlayer dummy)
-        {
-            dummy = GetDummyByOwner(owner);
-
-            return dummy != null;
-        }
-
-        public static DummyPlayer GetDummyByOwner(ReferenceHub owner)
-        {
-            return Dummies.FirstOrDefault(x => x.Owner != null && x.Owner.netId == owner.netId);
-        }
-
-        public static DummyPlayer GetDummy(ReferenceHub hub)
-        {
-            var dummy = Dummies.FirstOrDefault(x => x.Hub.GetInstanceID() == hub.GetInstanceID());
-
-            return dummy;
-        }
-
-        public static DummyPlayer GetOrCreateDummy(ReferenceHub hub, bool spawn = false)
-        {
-            if (!TryGetDummy(hub, out var dummy))
-                dummy = new DummyPlayer(hub.GetRoleId());
-
-            if (spawn)
-            {
-                Timing.CallDelayed(0.5f, () =>
+                if (_owner != null && _owner.netId != hub.netId)
                 {
-                    if (hub.roleManager.CurrentRole is IFpcRole fpcRole)
-                        dummy.Spawn(
-                            fpcRole.FpcModule.Position,
-                            fpcRole.FpcModule.CharacterModelInstance.transform.localScale,
-                            fpcRole.FpcModule.MouseLook.TargetHubRotation);
-                    else
-                        dummy.Spawn(
-                            hub.PlayerCameraReference.position, 
-                            hub.transform.localScale, 
-                            hub.PlayerCameraReference.rotation);
-                });
-            }
+                    if (_mutedTo.Contains(hub.netId))
+                        continue;
 
-            return dummy;
+                    if (MutedGlobal.Contains(hub.netId))
+                        continue;
+                }
+
+                hub.connectionToClient.Send(voiceMessage);
+            }
         }
+
+        public void SpeakTo(ReferenceHub hub, VoiceMessage voiceMessage)
+        {
+            if (((_owner != null && _owner.netId != hub.netId) && 
+                (_mutedTo.Contains(hub.netId) || MutedGlobal.Contains(hub.netId)
+                    || VoiceChannel is VoiceChatChannel.None)))
+                return;
+
+            if (voiceMessage.Speaker != _hub)
+                voiceMessage.Speaker = _hub;
+
+            if (voiceMessage.Channel != VoiceChannel)
+                voiceMessage.Channel = VoiceChannel;
+
+            hub.connectionToClient.Send(voiceMessage);
+        }
+
+        public void SpeakTo(ReferenceHub hub, byte[] data, int length)
+            => SpeakTo(hub, new VoiceMessage(hub, VoiceChannel, data, length, false));
+
+        public void MoveToZero()
+            => Position = Vector3.zero;
+
+        public static ReferenceHub InstantiatePlayer()
+            => Object.Instantiate(NetworkManager.singleton.playerPrefab).GetComponent<ReferenceHub>();
+
+        public static DummyConnection InstantiateConnection(int id)
+            => new DummyConnection(id);
 
         public static bool TryGetDummy(ReferenceHub hub, out DummyPlayer dummy)
         {
-            dummy = GetDummy(hub);
+            dummy = SpawnedDummies.FirstOrDefault(x => x._hub == hub);
 
             return dummy != null;
+        }
+
+        public static bool TryGetDummies(ReferenceHub owner, out HashSet<DummyPlayer> dummies)
+        {
+            dummies = new HashSet<DummyPlayer>();
+
+            foreach (var dummy in SpawnedDummies)
+            {
+                if (dummy._owner != null && dummy._owner != owner)
+                    dummies.Add(dummy);
+            }
+
+            return dummies.Count > 0;
         }
 
         public static void DestroyAll()
         {
-            IdIndex = 500;
-
-            foreach (var dummy in Dummies)
+            foreach (var dummy in SpawnedDummies)
+            {
                 dummy.Destroy();
+            }
+
+            SpawnedDummies.Clear();
         }
     }
 }
