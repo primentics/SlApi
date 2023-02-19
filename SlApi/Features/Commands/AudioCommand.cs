@@ -2,14 +2,11 @@
 
 using PluginAPI.Core;
 
-using SlApi.Audio;
 using SlApi.Extensions;
+using SlApi.Features.Audio;
 
 using System;
 using System.Linq;
-
-using UnityEngine;
-
 using VoiceChat;
 
 namespace SlApi.Commands
@@ -25,22 +22,18 @@ namespace SlApi.Commands
         {
             if (arguments.Count < 1) 
             {
-                response = "Missing arguments! audio <function> (function args)\n" +
+                response = "Missing arguments! \naudio <function> (function args)\n\n" +
                     "Functions:\n" +
-                    "   - spawn (true/false) (Spawns an audio player, the second argument indicates whether to use the sender's voice chat or spawn a dummy instead.).\n" +
-                    "   - despawn (Despawns your audio player).\n" +
-                    "   - config <name> <value> (Configures your audio player - channel, volume, follow, nick).\n" +
-                    "   - search <query> (Starts playing the first search result on YouTube)." +
-                    "   - play <url> (Starts playing a YouTube URL).\n" +
-                    "   - pause (Pauses the playback of your audio player).\n" +
-                    "   - resume (Resumes the playback of your audio player).\n" +
-                    "   - skip (Skips the current track).\n" +
-                    "   - stop (Stops playback).\n" +
-                    "   - clear (Clears the queue).\n" +
-                    "   - whitelist/wh <player> (Whitelists the broadcast to a player).\n" +
-                    "   - loop (Loops the current track).\n" +
-                    "   - scale (Scales your dummy).\n" +
-                    "   - blacklist/bh (Blacklists the broadcast from a player).";
+                    "   - create <speaker>\n" +
+                    "   - destroy\n" +
+                    "   - config <name> <value>\n" +
+                    "   - play <url>\n" +
+                    "   - pause\n" +
+                    "   - resume\n" +
+                    "   - skip\n" +
+                    "   - stop\n" +
+                    "   - clear\n" +
+                    "   - loop\n";
                 return false;
             }
 
@@ -54,32 +47,44 @@ namespace SlApi.Commands
 
             switch (arguments.At(0).ToLower())
             {
-                case "spawn":
+                case "create":
                     {
-                        if (TryGetPlayer(sender, out var player))
+                        if (arguments.Count < 2)
                         {
-                            response = "You already own a player!";
+                            response = "audio create <speaker>";
                             return false;
                         }
 
-                        player = AudioPlayer.GetOrCreatePlayer(sender);
+                        if (!HubExtensions.TryGetHub(arguments.At(1), out var speaker))
+                        {
+                            response = "You have to select the speaker!";
+                            return false;
+                        }
 
-                        response = "Player spawned.";
+                        if (AudioPlayer.TryGet(sender, out var audioPlayer))
+                        {
+                            response = "You already own an audio player.";
+                            return false;
+                        }
+
+                        audioPlayer = AudioPlayer.Create(sender, speaker);
+
+                        response = "Audio player created.";
                         return true;
                     }
 
-                case "despawn":
+                case "destroy":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own any active players!";
-                            return false;
+                            audioPlayer.Dispose();
+
+                            response = $"Audio player destroyed.";
+                            return true;
                         }
 
-                        UnityEngine.Object.Destroy(player);
-
-                        response = "Player despawned.";
-                        return true;
+                        response = "You don't seem to own an audio player.";
+                        return false;
                     }
 
                 case "config":
@@ -89,10 +94,10 @@ namespace SlApi.Commands
                             response = "Missing arguments! audio config <type> <value>";
                             return false;
                         }
-                        
-                        if (!TryGetPlayer(sender, out var player))
+
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player to configure.";
                             return false;
                         }
 
@@ -106,10 +111,20 @@ namespace SlApi.Commands
                                         return false;
                                     }
 
-                                    player.Player.VoiceChannel = channel;
+                                    if (audioPlayer.Channels.Contains(channel))
+                                    {
+                                        audioPlayer.Channels.Remove(channel);
 
-                                    response = $"Channel set to {channel}";
-                                    return true;
+                                        response = $"Disabled channel: {channel}";
+                                        return true;
+                                    }
+                                    else
+                                    {
+                                        audioPlayer.Channels.Add(channel);
+
+                                        response = $"Enabled channel: {channel}";
+                                        return true;
+                                    }
                                 }
 
                             case "volume":
@@ -120,46 +135,9 @@ namespace SlApi.Commands
                                         return false;
                                     }
 
-                                    player.AudioSettings.Volume = volume;
+                                    audioPlayer.Volume = volume;
 
                                     response = $"Volume set to {volume}";
-                                    return true;
-                                }
-
-                            case "follow":
-                                {
-                                    if (arguments.Count != 3)
-                                    {
-                                        response = "Missing arguments! audio config follow <target>";
-                                        return false;
-                                    }
-
-                                    if (!HubExtensions.TryGetHub(arguments.At(2), out var hub))
-                                    {
-                                        response = "Stopped following.";
-                                        player.Player.Follow(null);
-                                        return false;
-                                    }
-
-                                    player.Player.Follow(hub);
-
-                                    response = $"Following {hub.nicknameSync.MyNick}";
-                                    return true;
-                                }
-
-                            case "nick":
-                                {
-                                    if (arguments.Count < 3)
-                                    {
-                                        response = "Missing arguments! audio config nick <nick>";
-                                        return false;
-                                    }
-
-                                    string nick = string.Join(" ", arguments.Skip(2));
-
-                                    player.Player.NickName = nick;
-
-                                    response = $"Nick set to {nick}";
                                     return true;
                                 }
 
@@ -171,107 +149,91 @@ namespace SlApi.Commands
                         }
                     }
 
-                case "search":
+                case "play":
                     {
                         if (arguments.Count < 2)
                         {
-                            response = "Missing arguments! audio play <url>";
+                            response = "audio play <query>";
                             return false;
                         }
 
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own an audio player.";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
                         string query = string.Join(" ", arguments.Skip(1));
 
-                        player.CurrentCommand = sender;
-                        player.Search(query);
-
-                        response = "";
-                        return true;
-                    }
-
-                case "play":
-                    {
-                        if (arguments.Count < 2)
+                        audioPlayer.TrySearch(new AudioSearch
                         {
-                            response = "Missing arguments! audio play <url>";
-                            return false;
-                        }
-
-                        if (!TryGetPlayer(sender, out var player))
+                            Query = query
+                        }, out _, x =>
                         {
-                            response = "You don't own an audio player.";
-                            return false;
-                        }
+                            if (x.IsFinished)
+                            {
+                                if (x.IsError)
+                                    return;
 
-                        string url = arguments.At(1);
+                                audioPlayer.TryPlay(x.Result);
+                            }
+                        });
 
-                        player.CurrentCommand = sender;
-                        player.TryPlay(url);
-
-                        response = "";
+                        response = $"Searching for: {query}";
                         return true;
                     }
 
                 case "pause":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
-                        player.CurrentCommand = sender;
-                        player.Pause();
+                        audioPlayer.ShouldPlay = true;
 
-                        response = "";
+                        response = "Audio paused.";
                         return true;
                     }
 
                 case "resume":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
-                        player.CurrentCommand = sender;
-                        player.Resume();
+                        audioPlayer.ShouldPlay = true;
                         
-                        response = "";
+                        response = "Audio resumed.";
                         return true;
                     }
 
                 case "stop":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
-                        player.CurrentCommand = sender;
-                        player.Stop(true);
+                        audioPlayer.Stop();
 
-                        response = "Stopped.";
+                        response = "Audio stopped.";
                         return true;
                     }
 
                 case "clear":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
-                        player.CurrentCommand = sender;
-                        player.ClearQueue();
+                        audioPlayer.TrackQueue.Clear();
 
                         response = "Queue cleared.";
                         return true;
@@ -279,91 +241,45 @@ namespace SlApi.Commands
 
                 case "skip":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
-                        player.CurrentCommand = sender;
-                        player.Skip();
+                        audioPlayer.Skip();
 
-                        response = "";
+                        response = "Track skipped.";
                         return true;
                     }
 
                 case "loop":
                     {
-                        if (!TryGetPlayer(sender, out var player))
+                        if (!AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            response = "You don't own a player!";
+                            response = "You don't seem to own an audio player.";
                             return false;
                         }
 
-                        if (player.AudioSettings.Loop)
+                        if (audioPlayer.IsLooping)
                         {
-                            player.AudioSettings.Loop = false;
+                            audioPlayer.IsLooping = false;
 
                             response = "Loop disabled.";
                             return true;
                         }
                         else
                         {
-                            player.AudioSettings.Loop = true;
+                            audioPlayer.IsLooping = true;
 
                             response = "Loop enabled.";
                             return true;
                         }
                     }
-
-                case "scale":
-                    {
-                        if (arguments.Count != 4)
-                        {
-                            response = "Missing arguments! audio scale <x> <y> <z>";
-                            return false;
-                        }
-
-                        if (!float.TryParse(arguments.At(1), out var x))
-                        {
-                            response = "Failed to parse the X axis!";
-                            return false;
-                        }
-
-                        if (!float.TryParse(arguments.At(2), out var y))
-                        {
-                            response = "Failed to parse the Y axis!";
-                            return false;
-                        }
-
-                        if (!float.TryParse(arguments.At(3), out var z))
-                        {
-                            response = "Failed to parse the Z axis!";
-                            return false;
-                        }
-
-                        if (!TryGetPlayer(sender, out var player))
-                        {
-                            response = "You don't have an active dummy.";
-                            return false;
-                        }
-
-                        player.Player.Scale = new Vector3(x, y, z);
-
-                        response = $"Dummy scaled to {player.Player.Scale.ToPreciseString()}";
-                        return true;
-                    }
             }
 
             response = "Invalid function.";
             return false;
-        }
-
-        public static bool TryGetPlayer(ReferenceHub hub, out AudioPlayer player)
-        {
-            player = AudioPlayer.GetPlayer(hub);
-
-            return player != null;
         }
     }
 }

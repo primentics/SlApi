@@ -1,6 +1,4 @@
-﻿using MEC;
-
-using PlayerRoles;
+﻿using PlayerRoles;
 
 using Respawning;
 
@@ -14,6 +12,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
+using AzyWorks.Randomization.Weighted;
+
+using MEC;
+
 namespace SlApi.Features.RespawnTimer
 {
     public static class RespawnTimerController
@@ -24,6 +26,8 @@ namespace SlApi.Features.RespawnTimer
         {
             EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.WaitingForPlayers, OnWaitingForPlayers));
             EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.RoundStart, OnRoundStart));
+
+            EntryPoint.OnReloaded += CompileLines;
         }
 
         [Config("RespawnTimer.Enabled", "Whether or not to show hints.")]
@@ -41,32 +45,40 @@ namespace SlApi.Features.RespawnTimer
         [Config("RespawnTimer.HintInterval", "How often custom hints should be changed (in seconds).")]
         public static int HintInterval { get; set; } = 10;
 
-        [Config("RespawnTimer.NtfString", "The Nine-Tailed Fox display name.")]
-        public static string NtfString { get; set; } = "<color=blue>Nine-Tailed Fox</color>";
-
-        [Config("RespawnTimer.CiString", "The Chaos Insurgency display name.")]
-        public static string CiString { get; set; } = "<color=green>Chaos Insurgency</color>";
+        [Config("RespawnTimer.Translations")]
+        public static Dictionary<string, string> Translations { get; set; } = new Dictionary<string, string>()
+        {
+            ["activated"] = "activated",
+            ["deactivated"] = "deactivated",
+            ["detonated"] = "detonated",
+            ["to_detonation"] = "left until detonation",
+            ["chaos_insurgency"] = "<color=green>Chaos Insurgency</color>",
+            ["nine_tailed_fox"] = "<color=blue>Nine-Tailed Fox</color>"
+        };
 
         public static string BeforeSpawn { get; set; }
-        public static string DuringSpawn { get; set; } 
-
+        public static string DuringSpawn { get; set; }
 
         [Config("RespawnTimer.Hints", "A list of hints to show.")]
-        public static string[] Hints { get; set; } = new string[]
+        public static List<RespawnTimerHint> Hints { get; set; } = new List<RespawnTimerHint>
         {
-            "You <b>will</b> die in this game many times.",
-            "Don't throw grenades into elevators. It's not funny at all."
+            new RespawnTimerHint(),
+            new RespawnTimerHint()
         };
 
         public static HashSet<string> TimerHiddenFor { get; } = new HashSet<string>();
+        public static List<ReferenceHub> Spectators = new List<ReferenceHub>();
 
-        public static int CurHintIndex;
+        public static RespawnTimerHint CurHint;
         public static int CurHintInterval;
 
         public static readonly StringBuilder StringBuilder = new StringBuilder(1024);
 
         public static string GetText(int? spectators = null)
         {
+            if (CurHint is null)
+                CurHint = WeightPicker.Pick(Hints, x => x.Chance);
+
             StringBuilder.Clear();
             StringBuilder.Append(
                 RespawnManager.Singleton._curSequence != RespawnManager.RespawnSequencePhase.PlayingEntryAnimations
@@ -75,19 +87,14 @@ namespace SlApi.Features.RespawnTimer
                     : DuringSpawn);
 
             StringBuilder.SetAllProperties(spectators);
-
             StringBuilder.Replace("{RANDOM_COLOR}", $"#{UnityEngine.Random.Range(0x0, 0xFFFFFF):X6}");
             StringBuilder.Replace('{', '[').Replace('}', ']');
 
             CurHintInterval++;
-
             if (CurHintInterval >= HintInterval)
             {
                 CurHintInterval = 0;
-                CurHintIndex++;
-
-                if (CurHintIndex >= Hints.Length)
-                    CurHintIndex = 0;
+                CurHint = WeightPicker.Pick(Hints, x => x.Chance);
             }
 
             return StringBuilder.ToString();
@@ -120,26 +127,20 @@ namespace SlApi.Features.RespawnTimer
         {
             do
             {
-                if (!Enabled)
-                    continue;
-
                 yield return Timing.WaitForSeconds(1f);
 
-                var spectators = ReferenceHub.AllHubs.Where(x => x.Mode is ClientInstanceMode.ReadyClient
-                                                    && !x.isLocalPlayer
-                                                    && !x.IsAlive());
+                Spectators.Clear();
+                Spectators.AddRange(ReferenceHub.AllHubs.Where(x => x.Mode is ClientInstanceMode.ReadyClient && !x.IsAlive()));
 
-                string text = GetText(spectators.Count());
+                string text = GetText(Spectators.Count);
 
-                foreach (var spectator in spectators)
+                foreach (ReferenceHub hub in Spectators)
                 {
-                    if (spectator.roleManager.CurrentRole.RoleTypeId is RoleTypeId.Overwatch && !HideTimerForOverwatch)
+                    if (hub.GetRoleId() == RoleTypeId.Overwatch 
+                        && HideTimerForOverwatch || TimerHiddenFor.Contains(hub.characterClassManager.UserId))
                         continue;
 
-                    if (TimerHiddenFor.Contains(spectator.characterClassManager.UserId))
-                        continue;
-
-                    spectator.PersonalHint(text, 1.25f);
+                    hub.PersonalHint(text, 1.25f);
                 }
 
             } while (!RoundSummary.singleton._roundEnded);

@@ -104,8 +104,8 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Core" />
-    <Reference Include="System.Diagnostics.DiagnosticSource, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.7.0.0\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=7.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.7.0.1\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.Diagnostics.Tracing, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Diagnostics.Tracing.4.3.0\lib\net462\System.Diagnostics.Tracing.dll</HintPath>
@@ -224,8 +224,8 @@
     <Reference Include="System.Text.Encodings.Web, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Text.Encodings.Web.7.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Json, Version=7.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Text.Json.7.0.1\lib\net462\System.Text.Json.dll</HintPath>
+    <Reference Include="System.Text.Json, Version=7.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.7.0.2\lib\net462\System.Text.Json.dll</HintPath>
     </Reference>
     <Reference Include="System.Text.RegularExpressions, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Text.RegularExpressions.4.3.1\lib\net463\System.Text.RegularExpressions.dll</HintPath>
@@ -270,11 +270,24 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Configs\ConfigType.cs" />
+    <Compile Include="Features\Audio\AudioPlayer.cs" />
+    <Compile Include="Features\Audio\AudioSearch.cs" />
+    <Compile Include="Features\Audio\AudioTrack.cs" />
+    <Compile Include="Features\Audio\Conversion\ConversionProperties.cs" />
+    <Compile Include="Features\Audio\Conversion\Ffmpeg\FfmpegConverter.cs" />
+    <Compile Include="Features\Audio\Conversion\IConverter.cs" />
+    <Compile Include="Features\Audio\Conversion\Ogg\OggConverter.cs" />
+    <Compile Include="Features\ColorHelpers\ColorFader.cs" />
     <Compile Include="Features\Commands\BlackoutCommand.cs" />
+    <Compile Include="Features\Commands\DummyCommand.cs" />
     <Compile Include="Features\Commands\FakeRoleCommand.cs" />
     <Compile Include="Features\Commands\ForceRandomEventCommand.cs" />
+    <Compile Include="Features\Commands\GrabCommand.cs" />
+    <Compile Include="Features\Commands\RainbowLightCommand.cs" />
     <Compile Include="Features\Commands\SetInfoAreaCommand.cs" />
     <Compile Include="Features\Commands\SetInfoCommand.cs" />
+    <Compile Include="Features\Commands\SlReloadCommand.cs" />
+    <Compile Include="Features\Commands\UnGrabCommand.cs" />
     <Compile Include="Features\CustomTesla\CustomTeslaController.cs" />
     <Compile Include="Events\CustomHandlers\GenericHandler.cs" />
     <Compile Include="Events\EventHandlerDelegate.cs" />
@@ -285,10 +298,6 @@
     <Compile Include="Extensions\GeneratorExtensions.cs" />
     <Compile Include="Extensions\ItemExtensions.cs" />
     <Compile Include="Extensions\LockerExtensions.cs" />
-    <Compile Include="Features\Audio\AudioConverter.cs" />
-    <Compile Include="Features\Audio\AudioPlayer.cs" />
-    <Compile Include="Features\Audio\AudioSettings.cs" />
-    <Compile Include="Features\Audio\OggEncoder.cs" />
     <Compile Include="Features\Commands\AdminSpectateCommand.cs" />
     <Compile Include="Features\Commands\AdminVoiceCommand.cs" />
     <Compile Include="Features\Commands\FreezeCommand.cs" />
@@ -327,13 +336,18 @@
     <Compile Include="Features\Dummies\DummyPlayer.cs" />
     <Compile Include="EntryPoint.cs" />
     <Compile Include="Extensions\HubExtensions.cs" />
+    <Compile Include="Features\Fixes\SpawnPositionFix.cs" />
+    <Compile Include="Features\Grab\GrabbableObjects\PickupGrabbableObject.cs" />
+    <Compile Include="Features\Grab\GrabbableObjects\PlayerGrabbableObject.cs" />
+    <Compile Include="Features\Grab\PlayerGrabbableObjectBase.cs" />
+    <Compile Include="Features\Grab\PlayerGrabHelper.cs" />
+    <Compile Include="Features\Grab\PlayerGrabState.cs" />
     <Compile Include="Features\Overwatch\PersistentOverwatch.cs" />
     <Compile Include="Features\PlayerStates\AdminVoiceStates\AdminVoiceFlags.cs" />
     <Compile Include="Features\PlayerStates\AdminVoiceStates\AdminVoiceState.cs" />
     <Compile Include="Features\PlayerStates\FakeRoleStates\FakeRoleState.cs" />
     <Compile Include="Features\PlayerStates\FreezeStates\PlayerFreezeState.cs" />
     <Compile Include="Features\PlayerStates\FreezeStates\PlayerFreezeStateReason.cs" />
-    <Compile Include="Features\PlayerStates\InvisibleStates\InvisibilityFlags.cs" />
     <Compile Include="Features\PlayerStates\InvisibleStates\InvisibilityState.cs" />
     <Compile Include="Features\PlayerStates\PlayerStateController.cs" />
     <Compile Include="Features\PlayerStates\PlayerStateBase.cs" />
@@ -341,6 +355,8 @@
     <Compile Include="Features\PlayerStates\RocketStates\RocketState.cs" />
     <Compile Include="Features\PlayerStates\SpectateStates\SpectateFlags.cs" />
     <Compile Include="Features\PlayerStates\SpectateStates\SpectateState.cs" />
+    <Compile Include="Features\RainbowWarhead\RainbowLightController.cs" />
+    <Compile Include="Features\RainbowWarhead\RainbowWarheadController.cs" />
     <Compile Include="Features\RandomEvents\Events\RandomBlackoutEvent.cs" />
     <Compile Include="Features\RandomEvents\Events\Scp575Event.cs" />
     <Compile Include="Features\RemoteKeycard\RemoteCard.cs" />
@@ -354,6 +370,8 @@
     <Compile Include="Features\Spawnpoints\SpawnpointPlayerProperties.cs" />
     <Compile Include="Features\Spawnpoints\SpawnpointSyncMode.cs" />
     <Compile Include="Features\Tags\PersistentTagController.cs" />
+    <Compile Include="Features\ThreadingHelpers\ThreadHelper.cs" />
+    <Compile Include="Features\ThreadingHelpers\ThreadResult.cs" />
     <Compile Include="Features\Voice\AdminVoice\AdminVoiceChannel.cs" />
     <Compile Include="Features\Voice\AdminVoice\AdminVoiceProcessor.cs" />
     <Compile Include="Features\Voice\Custom\CustomVoiceChannel.cs" />
@@ -367,6 +385,7 @@
     <Compile Include="Features\Spawnpoints\SpawnpointManager.cs" />
     <Compile Include="Configs\Objects\Vector.cs" />
     <Compile Include="Patches\Dummy\CharacterClassManager_InstanceMode_DummyFIx.cs" />
+    <Compile Include="Patches\Dummy\FpcMouseLook_UpdateRotation_DummyFix.cs" />
     <Compile Include="Patches\Feature\DisarmedPlayers_CanDisarmed_Patch.cs" />
     <Compile Include="Patches\Feature\Escape_ServerHandlePlayer.cs" />
     <Compile Include="Patches\Feature\FpcServerPositionDistributor_WriteAll_Patch.cs" />
@@ -381,7 +400,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Features\RandomEvents\RandomEventBase.cs" />
     <Compile Include="Features\RandomEvents\RandomEventManager.cs" />
-    <Compile Include="Extensions\TaskUtils.cs" />
     <Compile Include="Features\Voice\VoiceChatManager.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -393,6 +411,9 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Features\CustomSinkholes\Sinkholes\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Features\RespawnTimer\RespawnTimerHint.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets" Condition="Exists('..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets')" />

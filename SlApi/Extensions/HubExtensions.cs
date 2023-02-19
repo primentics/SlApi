@@ -15,7 +15,7 @@ using PlayerRoles.FirstPersonControl;
 using PlayerStatsSystem;
 
 using RelativePositioning;
-
+using SlApi.Dummies;
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.ResizeStates;
 
@@ -236,6 +236,9 @@ namespace SlApi.Extensions
 
         public static void UseDisruptor(this ReferenceHub hub)
         {
+            if (DummyPlayer.IsDummy(hub))
+                return;
+
             if (!hub.IsAlive())
                 return;
 
@@ -245,11 +248,17 @@ namespace SlApi.Extensions
 
         public static void ConsoleMessage(this ReferenceHub hub, object message, string color = "green")
         {
+            if (DummyPlayer.IsDummy(hub))
+                return;
+
             hub.characterClassManager.ConsolePrint(message.ToString(), color);
         }
 
         public static void PersonalHint(this ReferenceHub hub, object message, float time)
         {
+            if (DummyPlayer.IsDummy(hub))
+                return;
+
             HintParameter[] parameters =
             {
                 new StringHintParameter(message.ToString())
@@ -260,6 +269,9 @@ namespace SlApi.Extensions
 
         public static void PersonalBroadcast(this ReferenceHub hub, object message, ushort time)
         {
+            if (DummyPlayer.IsDummy(hub))
+                return;
+
             Broadcast.Singleton?.TargetClearElements(hub.connectionToClient);
             Broadcast.Singleton?.TargetAddElement(hub.connectionToClient, message.ToString(), time, Broadcast.BroadcastFlags.Normal);
         }
@@ -272,7 +284,9 @@ namespace SlApi.Extensions
 
         public static ReferenceHub GetHub(string value)
         {
-            if (int.TryParse(value, out var pId))
+            if (value.StartsWith("dummy:") && byte.TryParse(value.Replace("dummy:", ""), out var id) && DummyPlayer.TryGetDummy(id, out var dummy) && dummy._hub != null)
+                return dummy._hub;
+            else if (int.TryParse(value, out var pId))
                 return ReferenceHub.GetHub(pId);
             else
                 return ReferenceHub.AllHubs.FirstOrDefault(x => x.nicknameSync.MyNick.ToLower().Contains(value.ToLower()) || x.characterClassManager.UserId.Contains(value));

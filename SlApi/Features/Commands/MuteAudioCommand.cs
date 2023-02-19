@@ -4,8 +4,8 @@ using PluginAPI.Core;
 
 using System;
 
-using SlApi.Audio;
 using SlApi.Dummies;
+using SlApi.Features.Audio;
 
 namespace SlApi.Commands
 {
@@ -28,9 +28,10 @@ namespace SlApi.Commands
                 return false;
             }
 
-            if (DummyPlayer.IsMutedToGlobal(player.ReferenceHub))
+            if (DummyPlayer.IsMutedToGlobal(player.ReferenceHub) || AudioPlayer.Mutes.Contains(player.UserId))
             {
                 DummyPlayer.UnmuteGlobal(player.ReferenceHub);
+                AudioPlayer.Mutes.Remove(player.UserId);
 
                 response = "Unmuted all audio.";
                 return true;
@@ -38,6 +39,7 @@ namespace SlApi.Commands
             else
             {
                 DummyPlayer.MuteGlobal(player.ReferenceHub);
+                AudioPlayer.Mutes.Add(player.UserId);
 
                 response = "Muted all audio.";
                 return true;

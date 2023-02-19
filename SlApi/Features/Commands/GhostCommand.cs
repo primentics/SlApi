@@ -30,7 +30,7 @@ namespace SlApi.Commands
             if (!player.TryGetState<InvisibilityState>(out var invisibilityState))
                 player.TryAddState((invisibilityState = new InvisibilityState(player)));
 
-            if (invisibilityState.Flags.HasFlag(InvisibilityFlags.InvisibleToAll))
+            if (invisibilityState.ToEveryone)
             {
                 invisibilityState.MakeVisibleToEveryone();
                 response = $"{player.nicknameSync.MyNick} now visible to everyone.";

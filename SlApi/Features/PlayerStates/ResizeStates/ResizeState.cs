@@ -3,7 +3,7 @@
 using PlayerRoles;
 
 using SlApi.Configs;
-
+using SlApi.Extensions;
 using UnityEngine;
 
 namespace SlApi.Features.PlayerStates.ResizeStates
@@ -47,6 +47,8 @@ namespace SlApi.Features.PlayerStates.ResizeStates
                 });
 
                 NetworkServer.SendSpawnMessage(Target.netIdentity, ply.connectionToClient);
+
+                ply.SendRoleMessage(new RoleSyncInfo(Target, Target.GetRoleId(), ply));
             }
         }
 

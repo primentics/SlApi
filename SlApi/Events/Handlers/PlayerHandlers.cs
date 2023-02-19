@@ -4,7 +4,6 @@ using PluginAPI.Enums;
 using PluginAPI.Core;
 using PluginAPI.Core.Attributes;
 
-using SlApi.Audio;
 using SlApi.Dummies;
 
 using PlayerStatsSystem;
@@ -12,6 +11,7 @@ using PlayerStatsSystem;
 using PlayerRoles;
 
 using InventorySystem.Items;
+using SlApi.Features.Audio;
 
 namespace SlApi.Events.Handlers
 {
@@ -33,6 +33,9 @@ namespace SlApi.Events.Handlers
             if (player.IsServer)
                 return;
 
+            if (DummyPlayer.IsDummy(player.ReferenceHub))
+                return;
+
             EventHandlers.TriggerEvents(ServerEventType.PlayerDropItem, player, itemBase);
         }
 
@@ -40,6 +43,9 @@ namespace SlApi.Events.Handlers
         public void OnRoleChanged(Player player, PlayerRoleBase oldRole, RoleTypeId newRole, RoleChangeReason changeReason)
         {
             if (player.IsServer)
+                return;
+
+            if (DummyPlayer.IsDummy(player.ReferenceHub))
                 return;
 
             EventHandlers.TriggerEvents(ServerEventType.PlayerChangeRole, player, oldRole, newRole, changeReason);
@@ -51,6 +57,9 @@ namespace SlApi.Events.Handlers
             if (player.IsServer)
                 return;
 
+            if (DummyPlayer.IsDummy(player.ReferenceHub))
+                return;
+
             EventHandlers.TriggerEvents(ServerEventType.PlayerDying, player, attacker, damageHandler);
         }
 
@@ -58,6 +67,9 @@ namespace SlApi.Events.Handlers
         public void OnSpawned(Player player, RoleTypeId role)
         {
             if (player.IsServer)
+                return;
+
+            if (DummyPlayer.IsDummy(player.ReferenceHub))
                 return;
 
             EventHandlers.TriggerEvents(ServerEventType.PlayerSpawn, player, role);
@@ -69,16 +81,15 @@ namespace SlApi.Events.Handlers
             if (player.IsServer)
                 return;
 
+            if (DummyPlayer.IsDummy(player.ReferenceHub))
+                return;
+
             EventHandlers.TriggerEvents(ServerEventType.PlayerLeft, player);
 
             try
             {
-                var audioPlayer = AudioPlayer.GetPlayer(player.ReferenceHub);
-
-                if (audioPlayer != null)
-                {
-                    AudioPlayer.Destroy(audioPlayer);
-                }
+                if (AudioPlayer.TryGet(player.ReferenceHub, out var audioPlayer))
+                    audioPlayer.Dispose();
             }
             catch { }
 
@@ -97,6 +108,9 @@ namespace SlApi.Events.Handlers
         public void OnPlayerJoined(Player player)
         {
             if (player.IsServer)
+                return;
+
+            if (DummyPlayer.IsDummy(player.ReferenceHub))
                 return;
 
             EventHandlers.TriggerEvents(ServerEventType.PlayerJoined, player);

@@ -5,6 +5,7 @@ using Mirror;
 using PlayerRoles.FirstPersonControl;
 using PlayerRoles.FirstPersonControl.NetworkMessages;
 using PlayerRoles.Visibility;
+
 using SlApi.Dummies;
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.InvisibleStates;
@@ -32,7 +33,7 @@ namespace SlApi.Patches.Feature
                     bool isInvisible = controller != null && !controller.ValidateVisibility(hub);
 
                     if (hub.TryGetState<InvisibilityState>(out var invisState))
-                        isInvisible = invisState.IsVisibleTo(receiver);
+                        isInvisible = !invisState.IsVisibleTo(receiver);
 
                     var syncData = FpcServerPositionDistributor.GetNewSyncData(receiver, hub, fpcRole.FpcModule, isInvisible);
 

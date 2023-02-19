@@ -50,12 +50,6 @@ namespace SlApi.Commands
             }
             else
             {
-                if (!invisibilityState.Flags.HasFlag(InvisibilityFlags.InvisibleToTargets))
-                {
-                    response = $"Cannot modify invisibility state! ({invisibilityState.Flags}).";
-                    return false;
-                }
-
                 invisibilityState.MakeVisibleToObserver(target);
 
                 response = $"{player.nicknameSync.MyNick} can now be seen by {target.nicknameSync.MyNick}.";

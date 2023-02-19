@@ -10,8 +10,6 @@ namespace SlApi.Features.PlayerStates.InvisibleStates
     {
         private HashSet<uint> _invisibleTo;
 
-        public InvisibilityFlags Flags { get; set; }
-
         [Config("InvisibilityState.ClearOnRoleChange", "Whether or not to clear invisibility on role change.")]
         public static bool ClearOnRoleChange { get; set; } = true;
 
@@ -21,9 +19,12 @@ namespace SlApi.Features.PlayerStates.InvisibleStates
         [Config("InvisibilityState.IgnoreNorthwoodStaff", "Whether or not to allow Northwood's staff members to bypass invisibility.")]
         public static bool IgnoreNwStaff { get; set; } = true;
 
+        public bool ToEveryone;
+        public bool ToNonStaff;
+
         public InvisibilityState(ReferenceHub target) : base(target)
         {
-            Flags = InvisibilityFlags.Visible;
+
         }
 
         public override void OnAdded()
@@ -44,36 +45,34 @@ namespace SlApi.Features.PlayerStates.InvisibleStates
 
         public void MakeInvisibleToObserver(ReferenceHub observer)
         {
-            if (!Flags.HasFlag(InvisibilityFlags.InvisibleToTargets))
-                Flags |= InvisibilityFlags.InvisibleToTargets;
-
             if (!_invisibleTo.Contains(observer.netId))
                 _invisibleTo.Add(observer.netId);
         }
 
         public void MakeVisibleToObserver(ReferenceHub observer)
         {
-            if (!Flags.HasFlag(InvisibilityFlags.InvisibleToTargets))
-                Flags |= InvisibilityFlags.InvisibleToTargets;
-
             if (_invisibleTo.Contains(observer.netId))
                 _invisibleTo.Remove(observer.netId);
         }
 
         public void MakeInvisibleToEveryone()
         {
-            Flags |= InvisibilityFlags.InvisibleToAll;
+            ToEveryone = true;
         }
 
         public void MakeVisibleToEveryone()
         {
-            Flags -= InvisibilityFlags.InvisibleToAll;
-            Flags -= InvisibilityFlags.InvisibleToNonStaff;
+            ToEveryone = false;
         }
 
         public void MakeInvisibleToNonStaff()
         {
-            Flags |= InvisibilityFlags.InvisibleToNonStaff;
+            ToNonStaff = true;
+        }
+
+        public void MakeVisibleToNonStaff()
+        {
+            ToNonStaff = false;
         }
 
         public bool IsVisibleTo(ReferenceHub observer)
@@ -82,14 +81,12 @@ namespace SlApi.Features.PlayerStates.InvisibleStates
                 return true;
             else if (observer.serverRoles.BypassMode)
                 return true;
-            else if (Flags.HasFlag(InvisibilityFlags.Visible))
-                return true;
-            else if (Flags.HasFlag(InvisibilityFlags.InvisibleToAll))
+            else if (ToEveryone)
                 return false;
-            else if (Flags.HasFlag(InvisibilityFlags.InvisibleToNonStaff) && !observer.serverRoles.RemoteAdmin)
+            else if (ToNonStaff && !observer.serverRoles.RemoteAdmin)
                 return false;
-            else if (Flags.HasFlag(InvisibilityFlags.InvisibleToTargets))
-                return !_invisibleTo.Contains(observer.netId);
+            else if (_invisibleTo.Contains(observer.netId))
+                return false;
             else
                 return true;
         }

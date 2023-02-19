@@ -6,8 +6,10 @@ using PluginAPI.Enums;
 using PluginAPI.Core.Attributes;
 
 using SlApi.Commands;
-using SlApi.Audio;
 using SlApi.Dummies;
+
+using PluginAPI.Core;
+using SlApi.Features.Audio;
 
 namespace SlApi.Events.Handlers
 {
@@ -21,6 +23,12 @@ namespace SlApi.Events.Handlers
                 throw new InvalidOperationException("RoundHandlers are already active!");
 
             Instance = this;
+        }
+
+        [PluginEvent(ServerEventType.WarheadStop)]
+        public void OnWarheadStopped(Player player)
+        {
+            EventHandlers.TriggerEvents(ServerEventType.WarheadStop, player);
         }
 
         [PluginEvent(ServerEventType.RoundStart)]
@@ -42,7 +50,6 @@ namespace SlApi.Events.Handlers
 
             DestroySpawnables();
 
-            try { AudioPlayer.DestroyAll(); } catch { }
             try { DummyPlayer.DestroyAll(); } catch { }
         }
 

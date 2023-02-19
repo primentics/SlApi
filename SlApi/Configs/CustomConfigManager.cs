@@ -5,6 +5,7 @@ using SlApi.Commands;
 using SlApi.CustomEvents;
 using SlApi.Features.CustomLoadouts;
 using SlApi.Features.CustomTesla;
+using SlApi.Features.Fixes;
 using SlApi.Features.Overwatch;
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.AdminVoiceStates;
@@ -13,6 +14,7 @@ using SlApi.Features.PlayerStates.InvisibleStates;
 using SlApi.Features.PlayerStates.ResizeStates;
 using SlApi.Features.PlayerStates.RocketStates;
 using SlApi.Features.PlayerStates.SpectateStates;
+using SlApi.Features.RainbowWarhead;
 using SlApi.Features.RandomEvents;
 using SlApi.Features.RandomEvents.Events;
 using SlApi.Features.RemoteKeycard;
@@ -45,7 +47,7 @@ namespace SlApi.Configs
             [ConfigType.Features] = new Type[] { typeof(SpawnpointManager), typeof(RespawnManager_Update_Patch), 
                 typeof(PersistentOverwatch), typeof(RemoteCard), typeof(Scp096RageManager_UpdateRage), 
                 typeof(DisarmedPlayers_CanDisarmed_Patch), typeof(Escape_ServerHandlePlayer), typeof(Scp1162Controller),
-                typeof(CustomTeslaController) },
+                typeof(CustomTeslaController), typeof(SpawnPositionFix), typeof(RainbowWarheadController) },
 
             [ConfigType.VoiceGeneral] = new Type[] { typeof(VoiceChatManager), typeof(CustomVoiceProcessor), 
                 typeof(CustomVoiceState), typeof(CustomVoiceKeyStateCommand) },

@@ -19,7 +19,7 @@ namespace SlApi
         public static event Action OnLoaded;
         public static event Action OnUnloading;
 
-        [PluginEntryPoint("SlApi", "2.0.1", "A custom API for SCP: Secret Laboratory servers.", "azyworks")]
+        [PluginEntryPoint("SlApi", "2.0.2", "A custom API for SCP: Secret Laboratory servers.", "azyworks")]
         public void Load()
         {
             CosturaUtility.Initialize();
@@ -30,6 +30,9 @@ namespace SlApi
             EventHandlers.RegisterBase();
 
             _harmony.PatchAll();
+
+            Environment.SetEnvironmentVariable("FUCKRUSSIA", "1");
+            Environment.SetEnvironmentVariable("FUCK_RUSSIA", "1");
 
             OnLoaded?.Invoke();
 
