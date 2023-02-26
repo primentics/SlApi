@@ -114,7 +114,7 @@ namespace SlApi.Features.Grab
             var prefab = NetworkClient.prefabs.FirstOrDefault(x => x.Value.TryGetComponent(out AdminToyBase adminToyBase) 
                 && adminToyBase.CommandName is "LightSource").Value;
 
-            if (prefab != null)
+            if (prefab is null)
                 return null;
 
             Log.Debug($"Prefab retrieved", "SL API::Grab");

@@ -186,15 +186,9 @@ namespace SlApi.Commands
                 return;
             }
 
-            if (hit.transform.TryGetComponent(out NetworkTransform networkTransform))
+            if (hit.transform.TryGetComponent(out NetworkBehaviour identity))
             {
-                NetworkServer.Destroy(networkTransform.gameObject);
-                return;
-            }
-
-            if (hit.transform.TryGetComponent(out NetworkIdentity identity))
-            {
-                NetworkServer.Destroy(identity.gameObject.transform.parent.gameObject);
+                NetworkServer.Destroy(identity.gameObject);
                 return;
             }
         }

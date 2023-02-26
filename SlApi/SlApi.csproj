@@ -70,9 +70,6 @@
     <Reference Include="Mirror-Publicized">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SCP Secret Laboratory Dedicated Server\SCPSL_Data\Managed\Mirror-Publicized.dll</HintPath>
     </Reference>
-    <Reference Include="Mirror.Components">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SCP Secret Laboratory Dedicated Server\SCPSL_Data\Managed\Mirror.Components.dll</HintPath>
-    </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.13.0.3-beta1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -270,6 +267,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Configs\ConfigType.cs" />
+    <Compile Include="Extensions\MirrorExtensions.cs" />
     <Compile Include="Features\Audio\AudioPlayer.cs" />
     <Compile Include="Features\Audio\AudioSearch.cs" />
     <Compile Include="Features\Audio\AudioTrack.cs" />
@@ -279,6 +277,7 @@
     <Compile Include="Features\Audio\Conversion\Ogg\OggConverter.cs" />
     <Compile Include="Features\ColorHelpers\ColorFader.cs" />
     <Compile Include="Features\Commands\BlackoutCommand.cs" />
+    <Compile Include="Features\Commands\DisableLightsCommand.cs" />
     <Compile Include="Features\Commands\DummyCommand.cs" />
     <Compile Include="Features\Commands\FakeRoleCommand.cs" />
     <Compile Include="Features\Commands\ForceRandomEventCommand.cs" />

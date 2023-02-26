@@ -28,12 +28,6 @@ namespace SlApi.Features.Grab.GrabbableObjects
         {
             GrabbedItem.transform.position = TargetPosition;
             GrabbedItem.transform.rotation = TargetRotation;
-
-            var info = GrabbedItem.NetworkInfo;
-
-            info.ServerSetPositionAndRotation(TargetPosition, TargetRotation);
-
-            GrabbedItem.NetworkInfo = info;
             GrabbedItem.RefreshPositionAndRotation();
         }
     }

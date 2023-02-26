@@ -7,6 +7,7 @@ using MEC;
 using SlApi.Configs;
 using SlApi.Events;
 using SlApi.Events.CustomHandlers;
+using SlApi.Extensions;
 using SlApi.Features.ColorHelpers;
 
 using System.Collections.Generic;
@@ -24,6 +25,8 @@ namespace SlApi.Features.RainbowWarhead
         public static int Chance = 25;
 
         public static ColorFader RainbowColor;
+
+        public static HashSet<string> BlacklistedUsers { get; } = new HashSet<string>();
 
         static RainbowWarheadController()
         {
@@ -60,8 +63,14 @@ namespace SlApi.Features.RainbowWarhead
 
             foreach (var light in FlickerableLightController.Instances)
             {
-                light.Network_warheadLightColor = Color.red;
-                light.Network_warheadLightOverride = false;
+                foreach (var hub in ReferenceHub.AllHubs)
+                {
+                    if (hub.Mode != ClientInstanceMode.ReadyClient)
+                        continue;
+
+                    if (BlacklistedUsers.Contains(hub.characterClassManager.UserId))
+                        continue;
+                }
             }
         }
 
@@ -69,9 +78,16 @@ namespace SlApi.Features.RainbowWarhead
         {
             foreach (var light in FlickerableLightController.Instances)
             {
-                light.Network_warheadLightColor = newColor;
-                light.Network_warheadLightOverride = true;
-                light.Network_lightIntensityMultiplier = 1f;
+                foreach (var hub in ReferenceHub.AllHubs)
+                {
+                    if (hub.Mode != ClientInstanceMode.ReadyClient)
+                        continue;
+
+                    if (BlacklistedUsers.Contains(hub.characterClassManager.UserId))
+                        continue;
+
+                    light.SetRoomColorForTargetOnly(hub, newColor);
+                }
             }
         }
 

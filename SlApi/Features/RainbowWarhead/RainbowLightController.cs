@@ -1,5 +1,4 @@
-﻿using PluginAPI.Core;
-
+﻿using SlApi.Extensions;
 using SlApi.Features.ColorHelpers;
 
 using UnityEngine;
@@ -26,8 +25,16 @@ namespace SlApi.Features.RainbowWarhead
             _color.Stop();
             _color.OnColorChanged -= OnColorChanged;
 
-            _light.Network_warheadLightColor = _origColor;
-            _light.Network_warheadLightOverride = false;
+            foreach (var hub in ReferenceHub.AllHubs)
+            {
+                if (hub.Mode != ClientInstanceMode.ReadyClient)
+                    continue;
+
+                if (RainbowWarheadController.BlacklistedUsers.Contains(hub.characterClassManager.UserId))
+                    continue;
+
+                _light.SetRoomColorForTargetOnly(hub, _origColor);
+            }
 
             _light = null;
             _color = null;
@@ -35,9 +42,16 @@ namespace SlApi.Features.RainbowWarhead
 
         private void OnColorChanged(Color newColor)
         {
-            _light.Network_warheadLightColor = newColor;
-            _light.Network_warheadLightOverride = true;
-            _light.Network_lightIntensityMultiplier = 1f;
+            foreach (var hub in ReferenceHub.AllHubs)
+            {
+                if (hub.Mode != ClientInstanceMode.ReadyClient)
+                    continue;
+
+                if (RainbowWarheadController.BlacklistedUsers.Contains(hub.characterClassManager.UserId))
+                    continue;
+
+                _light.SetRoomColorForTargetOnly(hub, newColor);
+            }
         }
     }
 }
