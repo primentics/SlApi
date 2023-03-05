@@ -1,4 +1,4 @@
-﻿using AzyWorks.Randomization.Weighted;
+﻿using AzyWorks.System.Weights;
 
 using PluginAPI.Core;
 
@@ -25,7 +25,6 @@ namespace SlApi.Features.RandomEvents
 
         public static HashSet<RandomEventBase> AllEvents { get; } = new HashSet<RandomEventBase>()
         {
-            new Scp575Event(),
             new RandomBlackoutEvent()
         };
 
@@ -62,7 +61,7 @@ namespace SlApi.Features.RandomEvents
 
             if (chosenEvents.Any())
             {
-                var chosenEvent = WeightPicker.Pick(chosenEvents, x => _lastEvent != null
+                var chosenEvent = WeightPick.Pick(chosenEvents, x => _lastEvent != null
                                                     && x.Id == _lastEvent.Id ?
                                                        Mathf.CeilToInt(x.Chance / 2) :
                                                        x.Chance);

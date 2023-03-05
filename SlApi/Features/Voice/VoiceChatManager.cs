@@ -38,6 +38,10 @@ namespace SlApi.Voice
             if (muteFlags is VcMuteFlags.GlobalRegular || muteFlags is VcMuteFlags.LocalRegular)
                 return false;
 
+            if (msg.Channel is VoiceChatChannel.Mimicry 
+                && msg.Speaker.roleManager.CurrentRole.RoleTypeId == PlayerRoles.RoleTypeId.Scp939)
+                return true;
+
             if (AdminVoiceProcessor.IsGloballyActive)
             {
                 if (AdminVoiceProcessor.IsAllowed(msg.Speaker))

@@ -1,5 +1,8 @@
 ﻿using System.Diagnostics;
 using System.IO;
+using System;
+
+using PluginAPI.Core;
 
 namespace SlApi.Features.Audio.Conversion.Ffmpeg
 {
@@ -14,7 +17,7 @@ namespace SlApi.Features.Audio.Conversion.Ffmpeg
         {
             _process = new Process();
             _process.StartInfo = new ProcessStartInfo("ffmpeg");
-            _process.StartInfo.UseShellExecute = false;
+            _process.StartInfo.UseShellExecute = true;
             _process.StartInfo.CreateNoWindow = true;
 
             _mp4Output = Path.ChangeExtension(Path.GetTempFileName(), "mp4");
@@ -23,32 +26,38 @@ namespace SlApi.Features.Audio.Conversion.Ffmpeg
 
         public bool Convert(byte[] input, ConversionProperties properties, out byte[] output)
         {
-            _process.StartInfo.Arguments = FormulateString(properties);
+            try {
+                _process.StartInfo.Arguments = FormulateString(properties);
 
-            File.WriteAllBytes(_mp4Output, input);
+                File.WriteAllBytes(_mp4Output, input);
 
-            _process.Start();
-            _process.WaitForExit();
+                _process.Start();
 
-            while (!_process.HasExited)
-                continue;
+                while (!_process.HasExited)
+                    continue;
 
-            _process.Dispose();
-            _process = null;
+                _process.Dispose();
+                _process = null;
 
-            File.Delete(_mp4Output);
+                File.Delete(_mp4Output);
 
-            output = File.ReadAllBytes(_rawOutput);
+                output = File.ReadAllBytes(_rawOutput);
 
-            File.Delete(_rawOutput);
+                File.Delete(_rawOutput);
+                return true;
+            }
+            catch (Exception ex) {
+                Log.Error($"{ex}", "SL API::FffmpegConverter");
+            }
 
-            return true;
+            output = null;
+            return false;
         }
 
         private string FormulateString(ConversionProperties properties)
         {
             return $"-i {_mp4Output} -ac {properties.Channels} " +
-                   $"-preset veryslow -acodec pcm_s16le -f s16le -ar {properties.SampleRate} {_rawOutput}";
+                   $"-acodec pcm_s16le -f s16le -ar {properties.SampleRate} {_rawOutput}";
         }
     }
 }

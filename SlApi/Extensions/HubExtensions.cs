@@ -1,25 +1,33 @@
-﻿using AngleSharp.Io;
-using Hints;
+﻿using Hints;
 
 using Interactables.Interobjects.DoorUtils;
 
 using InventorySystem;
 using InventorySystem.Items;
+using InventorySystem.Items.Firearms;
+using InventorySystem.Items.Firearms.Modules;
 using InventorySystem.Items.Keycards;
 
+using MapGeneration;
 using MapGeneration.Distributors;
+using Mirror;
+
+using NorthwoodLib.Pools;
 
 using PlayerRoles;
 using PlayerRoles.FirstPersonControl;
-
+using PlayerRoles.FirstPersonControl.NetworkMessages;
 using PlayerStatsSystem;
 
 using RelativePositioning;
+using Respawning;
+
 using SlApi.Dummies;
 using SlApi.Features.PlayerStates;
 using SlApi.Features.PlayerStates.ResizeStates;
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 using UnityEngine;
@@ -28,6 +36,195 @@ namespace SlApi.Extensions
 {
     public static class HubExtensions
     {
+        public static NetworkIdentity HostIdentity { get => ReferenceHub.HostHub?.networkIdentity ?? null; }
+
+        public static string UserId(this ReferenceHub hub)
+            => hub.characterClassManager.UserId;
+
+        public static string Nick(this ReferenceHub hub, string newValue = null) {
+            if (!string.IsNullOrWhiteSpace(newValue)) {
+                hub.nicknameSync.SetNick(newValue);
+                return hub.nicknameSync.Network_myNickSync;
+            }
+
+            return hub.nicknameSync.Network_myNickSync;
+        }
+
+        public static bool GodMode(this ReferenceHub hub, bool? newValue = null) {
+            if (newValue.HasValue) {
+                hub.characterClassManager.GodMode = newValue.Value;
+                return newValue.Value;
+            }
+
+            return hub.characterClassManager.GodMode;
+        }
+
+        public static HashSet<ReferenceHub> Where(this IEnumerable<ReferenceHub> hubs, Func<ReferenceHub, bool> condition) {
+            var set = new HashSet<ReferenceHub>();
+
+            foreach (var hub in hubs) {
+                if (hub is null)
+                    continue;
+
+                if (!condition(hub))
+                    continue;
+
+                set.Add(hub);
+            }
+
+            return set;
+        }
+
+        public static HashSet<ReferenceHub> WherePlayers(this IEnumerable<ReferenceHub> hubs, Func<ReferenceHub, bool> condition) {
+            var set = new HashSet<ReferenceHub>();
+
+            foreach (var hub in hubs) {
+                if (hub is null)
+                    continue;
+
+                if (hub.Mode != ClientInstanceMode.ReadyClient)
+                    continue;
+
+                if (hub.connectionToClient is null)
+                    continue;
+
+                if (DummyPlayer.IsDummy(hub))
+                    continue;
+
+                if (!condition(hub))
+                    continue;
+
+                set.Add(hub);
+            }
+
+            return set;
+        }
+
+        public static HashSet<ReferenceHub> WherePlayers(this IEnumerable<ReferenceHub> hubs, RoleTypeId role)
+            => hubs.WherePlayers(x => x.roleManager.CurrentRole != null && x.roleManager.CurrentRole.RoleTypeId == role);
+
+        public static void ForEach(this IEnumerable<ReferenceHub> hubs, Func<ReferenceHub, bool> condition, Action<ReferenceHub> action) {
+            foreach (var hub in hubs) {
+                if (hub is null)
+                    continue;
+
+                if (!condition(hub))
+                    continue;
+
+                action(hub);
+            }
+        }
+
+        public static void ForEachPlayer(this IEnumerable<ReferenceHub> hubs, Func<ReferenceHub, bool> condition, Action<ReferenceHub> action) {
+            foreach (var hub in hubs) {
+                if (hub is null)
+                    continue;
+
+                if (hub.Mode != ClientInstanceMode.ReadyClient)
+                    continue;
+
+                if (hub.connectionToClient is null)
+                    continue;
+
+                if (DummyPlayer.IsDummy(hub))
+                    continue;
+
+                if (!condition(hub))
+                    continue;
+
+                action(hub);
+            }
+        }
+
+        public static void ForEachPlayer(this IEnumerable<ReferenceHub> hubs,  Action<ReferenceHub> action) {
+            foreach (var hub in hubs) {
+                if (hub is null)
+                    continue;
+
+                if (hub.Mode != ClientInstanceMode.ReadyClient)
+                    continue;
+
+                if (hub.connectionToClient is null)
+                    continue;
+
+                if (DummyPlayer.IsDummy(hub))
+                    continue;
+
+                action(hub);
+            }
+        }
+
+        public static void PositionMessage(this ReferenceHub target, Vector3 position, float rotation = 0f) {
+            target?.connectionToClient?.Send(new FpcOverrideMessage(position, rotation));
+        }
+
+        public static void FakeRoleMessage(this ReferenceHub receiver, ReferenceHub target, RoleTypeId fakeRole) {
+            receiver?.connectionToClient?.Send(new RoleSyncInfo(target, fakeRole, receiver));
+        }
+
+        public static void DisruptorHit(this ReferenceHub target, Vector3 position, Quaternion rotation) {
+            target.connectionToClient?.Send(new DisruptorHitreg.DisruptorHitMessage {
+                Position = position,
+                Rotation = new LowPrecisionQuaternion(rotation)
+            });
+        }
+
+        public static void BeepSound(this ReferenceHub target) {
+            target.FakeRpc(HostIdentity, typeof(AmbientSoundPlayer), nameof(AmbientSoundPlayer.RpcPlaySound), 7);
+        }
+
+        public static void GunSound(this ReferenceHub target, Vector3 position, ItemType gunType, byte volume, byte clipId = 0) {
+            target.connectionToClient.Send(new GunAudioMessage {
+                AudioClipId = clipId,
+                MaxDistance = volume,
+                ShooterHub = target,
+                ShooterPosition = new RelativePosition(position),
+                Weapon = gunType
+            });
+        }
+
+        public static void TargetRoomColor(this ReferenceHub hub, RoomIdentifier room, Color color) {
+            var lightController = FlickerableLightController.Instances.FirstOrDefault(x => x.Room != null && x.Room.GetInstanceID() == room.GetInstanceID());
+            if (lightController is null)
+                return;
+
+            hub.FakeSyncVar(lightController.netIdentity, typeof(FlickerableLightController), nameof(FlickerableLightController.Network_warheadLightOverride), true);
+            hub.FakeSyncVar(lightController.netIdentity, typeof(FlickerableLightController), nameof(FlickerableLightController.Network_warheadLightColor), color);
+        }
+
+        public static void TargetCassie(this ReferenceHub hub, string cassieMessage, bool makeHold = false, bool makeNoise = true, bool isSubtitles = false) {
+            foreach (var controller in RespawnEffectsController.AllControllers) {
+                if (controller is null)
+                    continue;
+
+                hub.FakeRpc(controller.netIdentity, typeof(RespawnEffectsController), nameof(RespawnEffectsController.RpcCassieAnnouncement), cassieMessage, makeHold, makeNoise, isSubtitles);
+            }
+        }
+
+        public static void TargetCassieTranslation(this ReferenceHub hub, string cassieMessage, string translation, bool makeHold = false, bool makeNoise = true, bool isSubtitles = true) {
+            var annoucement = StringBuilderPool.Shared.Rent();
+            var cassies = cassieMessage.Split('\n');
+            var translations = translation.Split('\n');
+
+            for (int i = 0; i < cassies.Length; i++)
+                annoucement.Append($"{translations[i]}<size=0> {cassies[i].Replace(' ', ' ')} </size><split>");
+
+            cassieMessage = annoucement.ToString();
+
+            StringBuilderPool.Shared.Return(annoucement);
+
+            foreach (var controller in RespawnEffectsController.AllControllers) {
+                if (controller is null)
+                    continue;
+
+                hub.FakeRpc(controller.netIdentity, typeof(RespawnEffectsController), nameof(RespawnEffectsController.RpcCassieAnnouncement), cassieMessage, translation, makeHold, makeNoise, isSubtitles);
+            }
+        }
+
+        public static void TargetCustomInfoString(this ReferenceHub player, ReferenceHub target, string infoString) {
+            player.FakeSyncVar(target.networkIdentity, typeof(NicknameSync), nameof(NicknameSync.Network_customPlayerInfoString), infoString);
+        }
+
         public static AhpStat.AhpProcess[] GetActiveAhpProcesses(this ReferenceHub hub)
         {
             if (!hub.playerStats.TryGetModule<AhpStat>(out var module))

@@ -1,4 +1,4 @@
-﻿using AzyWorks.Randomization.Weighted;
+﻿using AzyWorks.System.Weights;
 
 using HarmonyLib;
 
@@ -86,7 +86,7 @@ namespace SlApi.Features.RainbowWarhead
                     if (BlacklistedUsers.Contains(hub.characterClassManager.UserId))
                         continue;
 
-                    light.SetRoomColorForTargetOnly(hub, newColor);
+                    hub.TargetRoomColor(light.Room, newColor);
                 }
             }
         }
@@ -98,7 +98,7 @@ namespace SlApi.Features.RainbowWarhead
             dict[true] = Chance;
             dict[false] = 100 - Chance;
 
-            if (WeightPicker.Pick(dict, x => x.Value).Key)
+            if (WeightPick.Pick(dict, x => x.Value).Key)
             {
                 RainbowColor = new ColorFader();
                 RainbowColor.OnColorChanged += DoRainbowLights;

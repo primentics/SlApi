@@ -312,7 +312,7 @@ namespace SlApi.Dummies
 
             var pos = _followedPlayer.gameObject.transform.position - Position;
             var mouseLook = fpcRole.FpcModule.MouseLook;
-            var rot = Quaternion.LookRotation(pos, Vector3.up / 2f);
+            var rot = Quaternion.LookRotation(pos.normalized, Vector3.forward);
 
             mouseLook.CurrentHorizontal = rot.eulerAngles.y;
             mouseLook.CurrentVertical = rot.eulerAngles.x;
@@ -320,7 +320,10 @@ namespace SlApi.Dummies
             _hub.PlayerCameraReference.rotation = rot;
 
             var distance = Vector3.Distance(_followedPlayer.gameObject.transform.position, Position);
-            if (distance >= 9f)
+            if (distance >= TeleportDistance) {
+                Position = _followedPlayer.GetRealPosition();
+            }
+            else if (distance >= RunDistance)
             {
                 var dir = (_followedPlayer.gameObject.transform.position - Position).normalized;
                 var velocity = dir * fpcRole.FpcModule.SprintSpeed;
@@ -331,7 +334,7 @@ namespace SlApi.Dummies
                 fpcRole.FpcModule.UpdateMovement();
                 fpcRole.FpcModule.StateProcessor?.UpdateMovementState(PlayerMovementState.Sprinting);
             }
-            else if (distance >= 6f)
+            else if (distance >= WalkDistance)
             {
                 var dir = (_followedPlayer.gameObject.transform.position - Position).normalized;
                 var velocity = dir * fpcRole.FpcModule.WalkSpeed;
@@ -341,10 +344,6 @@ namespace SlApi.Dummies
                 fpcRole.FpcModule.SyncMovementState = PlayerMovementState.Walking;
                 fpcRole.FpcModule.UpdateMovement();
                 fpcRole.FpcModule.StateProcessor?.UpdateMovementState(PlayerMovementState.Walking);
-            }
-            else if (distance >= TeleportDistance)
-            {
-                Position = _followedPlayer.GetRealPosition();
             }
             else
             {
@@ -421,14 +420,8 @@ namespace SlApi.Dummies
                 }
 
                 cam._cameraAnchor.rotation = rot;
-                cam.VerticalAxis.TargetValue = rot.eulerAngles.x;
-                cam.HorizontalAxis.TargetValue = rot.eulerAngles.y;
-                cam.RollRotation = rot.eulerAngles.z;
-                cam.VerticalAxis.OnValueChanged(rot.eulerAngles.x, cam);
-                cam.HorizontalAxis.OnValueChanged(rot.eulerAngles.y, cam);
-                cam.HorizontalAxis.Update(cam);
-                cam.VerticalAxis.Update(cam);
-                scp079._curCamSync.ServerSendRpc(true);
+                cam.transform.rotation = rot; 
+                cam.transform.localRotation = rot;
             }
             catch (Exception ex)
             {
@@ -443,7 +436,6 @@ namespace SlApi.Dummies
                 return;
 
             var door = hit.transform.GetComponentInParent<DoorVariant>();
-
             if (door != null && !door.NetworkTargetState)
             {
                 if (DestroyDoors && door is BreakableDoor breakable)

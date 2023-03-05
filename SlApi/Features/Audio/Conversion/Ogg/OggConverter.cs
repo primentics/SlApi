@@ -9,49 +9,32 @@ namespace SlApi.Features.Audio.Conversion.Ogg
     {
         public const int WriteBufferSize = 512;
 
-        public bool Convert(byte[] input, ConversionProperties properties, out byte[] output)
-        {
+        public bool Convert(byte[] input, ConversionProperties properties, out byte[] output) {
             var numPcmSamples = input.Length / 2 / properties.Channels;
             var pcmDuration = numPcmSamples / (float)properties.SampleRate;
-
             var numOutputSamples = (int)(pcmDuration * properties.SampleRate);
-
             numOutputSamples = (numOutputSamples / WriteBufferSize) * WriteBufferSize;
+            var outSamples = new float[properties.Channels][];
 
-            float[][] outSamples = new float[properties.Channels][];
-
-            for (int ch = 0; ch < properties.Channels; ch++)
-            {
+            for (int ch = 0; ch < properties.Channels; ch++) {
                 outSamples[ch] = new float[numOutputSamples];
             }
 
-            for (int sampleNumber = 0; sampleNumber < numOutputSamples; sampleNumber++)
-            {
-                for (int ch = 0; ch < properties.Channels; ch++)
-                {
-                    int sampleIndex = (sampleNumber * properties.Channels) * 2;
-
-                    if (ch < properties.Channels) 
+            for (int sampleNumber = 0; sampleNumber < numOutputSamples; sampleNumber++) {
+                for (int ch = 0; ch < properties.Channels; ch++) {
+                    var sampleIndex = (sampleNumber * properties.Channels) * 2;
+                    if (ch < properties.Channels)
                         sampleIndex += (ch * 2);
-
-                    outSamples[ch][sampleNumber] = ShortToSample((short)(input[sampleIndex + 1] << 8 | input[sampleIndex]));
+                    outSamples[ch][sampleNumber] = ((short)(input[sampleIndex + 1] << 8 | input[sampleIndex])) / 32768f;
                 }
             }
 
-            output = GetBytes(outSamples, properties);
-            return true;
-        }
-
-        private byte[] GetBytes(float[][] floatSamples, ConversionProperties properties)
-        {
             var outputData = new MemoryStream();
             var info = VorbisInfo.InitVariableBitRate(properties.Channels, properties.SampleRate, 0.5f);
             var serial = new Random().Next();
             var oggStream = new OggStream(serial);
             var comments = new Comments();
-
             comments.AddTag("ARTIST", "TEST");
-
             var infoPacket = HeaderPacketBuilder.BuildInfoPacket(info);
             var commentsPacket = HeaderPacketBuilder.BuildCommentsPacket(comments);
             var booksPacket = HeaderPacketBuilder.BuildBooksPacket(info);
@@ -60,48 +43,38 @@ namespace SlApi.Features.Audio.Conversion.Ogg
             oggStream.PacketIn(commentsPacket);
             oggStream.PacketIn(booksPacket);
 
-            FlushPages(oggStream, outputData, true);
+            void FlushPages(Stream outp, bool force) {
+                while (oggStream.PageOut(out OggPage page, force)) {
+                    outp.Write(page.Header, 0, page.Header.Length);
+                    outp.Write(page.Body, 0, page.Body.Length);
+                }
+            }
+
+            FlushPages(outputData, true);
 
             var processingState = ProcessingState.Create(info);
 
-            for (int readIndex = 0; readIndex <= floatSamples[0].Length; readIndex += WriteBufferSize)
-            {
-                if (readIndex == floatSamples[0].Length)
-                {
+            for (int readIndex = 0; readIndex <= outSamples[0].Length; readIndex += WriteBufferSize) {
+                if (readIndex == outSamples[0].Length) {
                     processingState.WriteEndOfStream();
                 }
-                else
-                {
-                    processingState.WriteData(floatSamples, WriteBufferSize, readIndex);
+                else {
+                    processingState.WriteData(outSamples, WriteBufferSize, readIndex);
                 }
 
-                while (!oggStream.Finished && processingState.PacketOut(out OggPacket packet))
-                {
+                while (!oggStream.Finished && processingState.PacketOut(out OggPacket packet)) {
                     oggStream.PacketIn(packet);
 
-                    FlushPages(oggStream, outputData, false);
+                    FlushPages(outputData, false);
                 }
             }
 
-            FlushPages(oggStream, outputData, true);
+            FlushPages(outputData, true);
 
-            var data = outputData.ToArray();
-
+            output = outputData.ToArray();
             outputData.Dispose();
 
-            return data;
+            return true;
         }
-
-        private void FlushPages(OggStream oggStream, Stream output, bool force)
-        {
-            while (oggStream.PageOut(out OggPage page, force))
-            {
-                output.Write(page.Header, 0, page.Header.Length);
-                output.Write(page.Body, 0, page.Body.Length);
-            }
-        }
-
-        private float ShortToSample(short pcmValue)
-            => pcmValue / 32768f;
     }
 }

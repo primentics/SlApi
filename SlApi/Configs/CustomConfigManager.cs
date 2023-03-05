@@ -18,6 +18,7 @@ using SlApi.Features.RainbowWarhead;
 using SlApi.Features.RandomEvents;
 using SlApi.Features.RandomEvents.Events;
 using SlApi.Features.RemoteKeycard;
+using SlApi.Features.Respawning;
 using SlApi.Features.RespawnTimer;
 using SlApi.Features.Scp1162;
 using SlApi.Features.Spawnpoints;
@@ -44,10 +45,10 @@ namespace SlApi.Configs
         {
             [ConfigType.Main] = new Type[] { typeof(Logger) },
 
-            [ConfigType.Features] = new Type[] { typeof(SpawnpointManager), typeof(RespawnManager_Update_Patch), 
+            [ConfigType.Features] = new Type[] { typeof(SpawnpointManager), 
                 typeof(PersistentOverwatch), typeof(RemoteCard), typeof(Scp096RageManager_UpdateRage), 
                 typeof(DisarmedPlayers_CanDisarmed_Patch), typeof(Escape_ServerHandlePlayer), typeof(Scp1162Controller),
-                typeof(CustomTeslaController), typeof(SpawnPositionFix), typeof(RainbowWarheadController) },
+                typeof(CustomTeslaController), typeof(SpawnPositionFix), typeof(RainbowWarheadController), typeof(TeamRespawner) },
 
             [ConfigType.VoiceGeneral] = new Type[] { typeof(VoiceChatManager), typeof(CustomVoiceProcessor), 
                 typeof(CustomVoiceState), typeof(CustomVoiceKeyStateCommand) },

@@ -41,8 +41,8 @@
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net48\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="AngleSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=e83494dcdc6d31ea, processorArchitecture=MSIL">
-      <HintPath>..\packages\AngleSharp.1.0.1\lib\net472\AngleSharp.dll</HintPath>
+    <Reference Include="AngleSharp, Version=1.0.2.0, Culture=neutral, PublicKeyToken=e83494dcdc6d31ea, processorArchitecture=MSIL">
+      <HintPath>..\packages\AngleSharp.1.0.2-alpha-278\lib\net472\AngleSharp.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SCP Secret Laboratory Dedicated Server\SCPSL_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
@@ -59,8 +59,8 @@
     <Reference Include="Costura, Version=5.8.0.0, Culture=neutral, PublicKeyToken=9919ef960d84173d, processorArchitecture=MSIL">
       <HintPath>..\packages\Costura.Fody.5.8.0-alpha0098\lib\netstandard1.0\Costura.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.7.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.8.0.0-preview.1.23110.8\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Win32.Primitives, Version=4.0.2.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Win32.Primitives.4.3.0\lib\net46\Microsoft.Win32.Primitives.dll</HintPath>
@@ -101,8 +101,8 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Core" />
-    <Reference Include="System.Diagnostics.DiagnosticSource, Version=7.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.7.0.1\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.8.0.0-preview.1.23110.8\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.Diagnostics.Tracing, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Diagnostics.Tracing.4.3.0\lib\net462\System.Diagnostics.Tracing.dll</HintPath>
@@ -215,14 +215,14 @@
       <Private>True</Private>
       <Private>True</Private>
     </Reference>
-    <Reference Include="System.Text.Encoding.CodePages, Version=7.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Text.Encoding.CodePages.7.0.0\lib\net462\System.Text.Encoding.CodePages.dll</HintPath>
+    <Reference Include="System.Text.Encoding.CodePages, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encoding.CodePages.8.0.0-preview.1.23110.8\lib\net462\System.Text.Encoding.CodePages.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Encodings.Web, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Text.Encodings.Web.7.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    <Reference Include="System.Text.Encodings.Web, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encodings.Web.8.0.0-preview.1.23110.8\lib\net462\System.Text.Encodings.Web.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Json, Version=7.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Text.Json.7.0.2\lib\net462\System.Text.Json.dll</HintPath>
+    <Reference Include="System.Text.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.8.0.0-preview.1.23110.8\lib\net462\System.Text.Json.dll</HintPath>
     </Reference>
     <Reference Include="System.Text.RegularExpressions, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Text.RegularExpressions.4.3.1\lib\net463\System.Text.RegularExpressions.dll</HintPath>
@@ -258,8 +258,8 @@
     <Reference Include="UnityEngine.PhysicsModule">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\SCP Secret Laboratory Dedicated Server\SCPSL_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
     </Reference>
-    <Reference Include="YoutubeExplode, Version=6.2.6.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\YoutubeExplode.6.2.6\lib\net461\YoutubeExplode.dll</HintPath>
+    <Reference Include="YoutubeExplode, Version=6.2.8.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\YoutubeExplode.6.2.8\lib\net461\YoutubeExplode.dll</HintPath>
     </Reference>
     <Reference Include="YoutubeSearch, Version=2.2.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Mayerch1.YoutubeSearch.2.2.0\lib\netstandard2.0\YoutubeSearch.dll</HintPath>
@@ -267,7 +267,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Configs\ConfigType.cs" />
-    <Compile Include="Extensions\MirrorExtensions.cs" />
+    <Compile Include="Extensions\NetworkExtensions.cs" />
     <Compile Include="Features\Audio\AudioPlayer.cs" />
     <Compile Include="Features\Audio\AudioSearch.cs" />
     <Compile Include="Features\Audio\AudioTrack.cs" />
@@ -283,7 +283,6 @@
     <Compile Include="Features\Commands\ForceRandomEventCommand.cs" />
     <Compile Include="Features\Commands\GrabCommand.cs" />
     <Compile Include="Features\Commands\RainbowLightCommand.cs" />
-    <Compile Include="Features\Commands\SetInfoAreaCommand.cs" />
     <Compile Include="Features\Commands\SetInfoCommand.cs" />
     <Compile Include="Features\Commands\SlReloadCommand.cs" />
     <Compile Include="Features\Commands\UnGrabCommand.cs" />
@@ -359,8 +358,12 @@
     <Compile Include="Features\RandomEvents\Events\RandomBlackoutEvent.cs" />
     <Compile Include="Features\RandomEvents\Events\Scp575Event.cs" />
     <Compile Include="Features\RemoteKeycard\RemoteCard.cs" />
+    <Compile Include="Features\Respawning\TeamRespawner.cs" />
+    <Compile Include="Features\Respawning\TeamRespawnTime.cs" />
+    <Compile Include="Features\Respawning\TeamRespawnConditions.cs" />
     <Compile Include="Features\RespawnTimer\RespawnTimerController.cs" />
     <Compile Include="Features\RespawnTimer\StringBuilderExtensions.cs" />
+    <Compile Include="Features\RoundHelper.cs" />
     <Compile Include="Features\Scp1162\Scp1162Controller.cs" />
     <Compile Include="Features\Scp1162\Scp1162Item.cs" />
     <Compile Include="Features\Scp1162\Scp1162Mode.cs" />
@@ -369,8 +372,8 @@
     <Compile Include="Features\Spawnpoints\SpawnpointPlayerProperties.cs" />
     <Compile Include="Features\Spawnpoints\SpawnpointSyncMode.cs" />
     <Compile Include="Features\Tags\PersistentTagController.cs" />
-    <Compile Include="Features\ThreadingHelpers\ThreadHelper.cs" />
-    <Compile Include="Features\ThreadingHelpers\ThreadResult.cs" />
+    <Compile Include="Features\AsyncHelpers\TaskHelper.cs" />
+    <Compile Include="Features\AsyncHelpers\ThreadHelper.cs" />
     <Compile Include="Features\Voice\AdminVoice\AdminVoiceChannel.cs" />
     <Compile Include="Features\Voice\AdminVoice\AdminVoiceProcessor.cs" />
     <Compile Include="Features\Voice\Custom\CustomVoiceChannel.cs" />
@@ -379,7 +382,6 @@
     <Compile Include="Features\Voice\Custom\CustomVoiceProcessor.cs" />
     <Compile Include="Features\Voice\Custom\CustomVoiceState.cs" />
     <Compile Include="Logger.cs" />
-    <Compile Include="Extensions\NetworkUtils.cs" />
     <Compile Include="Features\Spawnpoints\SpawnpointBase.cs" />
     <Compile Include="Features\Spawnpoints\SpawnpointManager.cs" />
     <Compile Include="Configs\Objects\Vector.cs" />
@@ -394,7 +396,6 @@
     <Compile Include="Patches\Feature\RemoteCard\Locker_ServerInteract_Patch.cs" />
     <Compile Include="Patches\Feature\RemoteCard\PlayerInteract_UserCode_CmdSwitchAWButton_Patch.cs" />
     <Compile Include="Patches\Feature\RemoteCard\Scp079Generator_ServerInteract_Patch.cs" />
-    <Compile Include="Patches\Feature\RespawnManager_Update_Patch.cs" />
     <Compile Include="Patches\Feature\Scp096RageManager_UpdateRage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Features\RandomEvents\RandomEventBase.cs" />

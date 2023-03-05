@@ -12,7 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-using AzyWorks.Randomization.Weighted;
+using AzyWorks.System.Weights;
 
 using MEC;
 
@@ -77,7 +77,7 @@ namespace SlApi.Features.RespawnTimer
         public static string GetText(int? spectators = null)
         {
             if (CurHint is null)
-                CurHint = WeightPicker.Pick(Hints, x => x.Chance);
+                CurHint = WeightPick.Pick(Hints, x => x.Chance);
 
             StringBuilder.Clear();
             StringBuilder.Append(
@@ -94,7 +94,7 @@ namespace SlApi.Features.RespawnTimer
             if (CurHintInterval >= HintInterval)
             {
                 CurHintInterval = 0;
-                CurHint = WeightPicker.Pick(Hints, x => x.Chance);
+                CurHint = WeightPick.Pick(Hints, x => x.Chance);
             }
 
             return StringBuilder.ToString();

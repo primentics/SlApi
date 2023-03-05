@@ -12,6 +12,7 @@ using PlayerRoles;
 
 using InventorySystem.Items;
 using SlApi.Features.Audio;
+using UnityEngine;
 
 namespace SlApi.Events.Handlers
 {
@@ -89,7 +90,7 @@ namespace SlApi.Events.Handlers
             try
             {
                 if (AudioPlayer.TryGet(player.ReferenceHub, out var audioPlayer))
-                    audioPlayer.Dispose();
+                    GameObject.Destroy(audioPlayer);
             }
             catch { }
 

@@ -64,7 +64,7 @@ namespace SlApi.Commands
             if (!Physics.Raycast(hub.PlayerCameraReference.position, hub.PlayerCameraReference.forward, out var hit, MaxDistance, Physics.AllLayers))
                 return;
 
-            NetworkUtils.SendDisruptorHitMessage(hit.transform.position, Quaternion.LookRotation(-hit.normal));
+            ReferenceHub.AllHubs.ForEachPlayer(x => x.DisruptorHit(hit.transform.position, Quaternion.LookRotation(-hit.normal)));
 
             if (hit.transform.TryGetComponent(out IDestructible destructible) 
                 && ReferenceHub.TryGetHubNetID(destructible.NetworkId, out var target)

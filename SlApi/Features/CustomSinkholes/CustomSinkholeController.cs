@@ -4,7 +4,7 @@ using SlApi.Events;
 
 using System.Collections.Generic;
 
-using AzyWorks.Randomization.Weighted;
+using AzyWorks.System.Weights;
 
 using UnityEngine;
 
@@ -70,7 +70,7 @@ namespace SlApi.Features.CustomSinkholes
                 chosenSinkholes.Add(sinkhole);
             }
 
-            var chosenSinkhole = WeightPicker.Pick(chosenSinkholes, x =>
+            var chosenSinkhole = WeightPick.Pick(chosenSinkholes, x =>
                                             x.SpawnedThisRound > 0
                                                 ? Mathf.CeilToInt(x.Chance / (x.SpawnedThisRound / 2f))
                                                 : x.Chance);

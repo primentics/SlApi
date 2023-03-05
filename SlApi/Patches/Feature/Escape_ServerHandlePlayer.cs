@@ -1,4 +1,4 @@
-﻿using AzyWorks.Randomization.Weighted;
+﻿using AzyWorks.System.Weights;
 
 using HarmonyLib;
 
@@ -70,7 +70,7 @@ namespace SlApi.Patches.Feature
 
             if (escape != null)
             {
-                changeTo = WeightPicker.Pick(escape.ChangingTo, x => x.Value).Key;
+                changeTo = WeightPick.Pick(escape.ChangingTo, x => x.Value).Key;
                 return true;
             }
 

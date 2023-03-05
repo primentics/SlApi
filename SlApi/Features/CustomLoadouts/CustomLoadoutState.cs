@@ -1,4 +1,5 @@
-﻿using AzyWorks.Utilities;
+﻿using AzyWorks.System;
+using AzyWorks.Utilities;
 
 using NorthwoodLib.Pools;
 
@@ -34,20 +35,13 @@ namespace SlApi.Features.CustomLoadouts
 
         public override void OnRoleChanged()
         {
-            Log.Debug($"OnRoleChanged < {_activeModifiers.Count} {_hpStat != null} {_ahpStat != null}", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
             _activeModifiers.Clear();
-
             _hpStat = Target.playerStats.GetModule<HealthStat>() as CustomHealthStat;
             _ahpStat = Target.playerStats.GetModule<AhpStat>();
-
-            Log.Debug($"OnRoleChanged > {_activeModifiers.Count} {_hpStat != null} {_ahpStat != null}", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
         }
 
         public override void OnDied()
         {
-            Log.Debug($"OnDied", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
             _activeModifiers.Clear();
 
             _hpStat = null;
@@ -56,8 +50,6 @@ namespace SlApi.Features.CustomLoadouts
 
         public override void OnAdded()
         {
-            Log.Debug($"OnAdded", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
             _activeModifiers = new Dictionary<CustomLoadoutCharacterModifier, CustomLoadoutCharacterModifierUpdateState>();
             _removeNextFrame = HashSetPool<CustomLoadoutCharacterModifier>.Shared.Rent();
 
@@ -67,8 +59,6 @@ namespace SlApi.Features.CustomLoadouts
 
         public override void DisposeState()
         {
-            Log.Debug($"DisposeState", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
             _activeModifiers.Clear();
             _activeModifiers = null;
 
@@ -85,14 +75,9 @@ namespace SlApi.Features.CustomLoadouts
         {
             if (_removeNextFrame.Count > 0)
             {
-                Log.Debug($"Removing on next frame", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
                 for (int i = 0; i < _removeNextFrame.Count; i++)
                 {
                     var remove = _removeNextFrame.ElementAt(i);
-
-                    Log.Debug($"Removing {remove.Type}", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
                     if (remove != null)
                         _activeModifiers.Remove(remove);
                 }
@@ -102,25 +87,19 @@ namespace SlApi.Features.CustomLoadouts
 
             foreach (var modifier in _activeModifiers)
             {
-                Log.Debug($"Processing modifier {modifier.Key.Type}", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
                 if (!modifier.Value.EverUpdated)
                 {
-                    Log.Debug($"First update", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
                     if (!modifier.Value.IsPermanent)
                     {
                         ParseModifierValue(modifier.Key, modifier.Value);
                         UpdateSpecificModifier(modifier.Key, modifier.Value);
                         modifier.Value.EverUpdated = true;
-                        Log.Debug($"Temporary", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
                     }
                     else
                     {
                         ParseModifierValue(modifier.Key, modifier.Value);
                         UpdatePermanentModifier(modifier.Key, modifier.Value);
                         modifier.Value.EverUpdated = true;
-                        Log.Debug($"Permanent", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
                     }
                 }
                 else
@@ -138,15 +117,11 @@ namespace SlApi.Features.CustomLoadouts
 
         private void UpdatePermanentModifier(CustomLoadoutCharacterModifier modifier, CustomLoadoutCharacterModifierUpdateState state)
         {
-            Log.Debug($"UpdatePermanent: {modifier.Type} {state.EverUpdated} {state.LastUpdate} {state.DurationTracker}", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
             if (!state.EverUpdated)
                 SetupModifier(modifier);
 
             if ((DateTime.Now - state.LastUpdate).TotalSeconds < 1)
                 return;
-
-            Log.Debug($"Doing permanent modifier", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
 
             DoModifier(modifier, state);
         }
@@ -353,8 +328,6 @@ namespace SlApi.Features.CustomLoadouts
 
         private void OnModifierApplied(ReferenceHub hub, CustomLoadoutCharacterModifier modifier)
         {
-            Log.Debug($"OnModifierApplied: {hub.netId}/{Target.netId}, {modifier.Type} {modifier.Value} {modifier.Duration} {modifier.ValueType}", CustomLoadoutsController.Debug, "SL API::Custom Loadout State");
-
             if (hub.netId != Target.netId)
                 return;
             else if (modifier.Duration is CustomLoadoutCharacterModifierDuration.Instant)

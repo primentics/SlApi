@@ -47,9 +47,9 @@ namespace SlApi.Features.PlayerStates.ResizeStates
                 });
 
                 NetworkServer.SendSpawnMessage(Target.netIdentity, ply.connectionToClient);
-
-                ply.SendRoleMessage(new RoleSyncInfo(Target, Target.GetRoleId(), ply));
             }
+
+            Target.roleManager.ServerSetRole(Target.roleManager.CurrentRole.RoleTypeId, RoleChangeReason.RemoteAdmin, RoleSpawnFlags.None);
         }
 
         public void ResetScale()

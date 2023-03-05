@@ -7,6 +7,7 @@ using SlApi.Features.Audio;
 
 using System;
 using System.Linq;
+using UnityEngine;
 using VoiceChat;
 
 namespace SlApi.Commands
@@ -69,7 +70,7 @@ namespace SlApi.Commands
 
                         audioPlayer = AudioPlayer.Create(sender, speaker);
 
-                        response = "Audio player created.";
+                        response = $"Audio player created with speaker {speaker.nicknameSync.Network_myNickSync}";
                         return true;
                     }
 
@@ -77,7 +78,7 @@ namespace SlApi.Commands
                     {
                         if (AudioPlayer.TryGet(sender, out var audioPlayer))
                         {
-                            audioPlayer.Dispose();
+                            GameObject.Destroy(audioPlayer);
 
                             response = $"Audio player destroyed.";
                             return true;
@@ -111,20 +112,10 @@ namespace SlApi.Commands
                                         return false;
                                     }
 
-                                    if (audioPlayer.Channels.Contains(channel))
-                                    {
-                                        audioPlayer.Channels.Remove(channel);
+                                    audioPlayer.VoiceChannel = channel;
 
-                                        response = $"Disabled channel: {channel}";
-                                        return true;
-                                    }
-                                    else
-                                    {
-                                        audioPlayer.Channels.Add(channel);
-
-                                        response = $"Enabled channel: {channel}";
-                                        return true;
-                                    }
+                                    response = $"Channel set to {channel}";
+                                    return true;
                                 }
 
                             case "volume":
@@ -165,21 +156,9 @@ namespace SlApi.Commands
 
                         string query = string.Join(" ", arguments.Skip(1));
 
-                        audioPlayer.TrySearch(new AudioSearch
-                        {
-                            Query = query
-                        }, out _, x =>
-                        {
-                            if (x.IsFinished)
-                            {
-                                if (x.IsError)
-                                    return;
+                        audioPlayer.TryPlay(query);
 
-                                audioPlayer.TryPlay(x.Result);
-                            }
-                        });
-
-                        response = $"Searching for: {query}";
+                        response = $"Searching for: {query}\nYou can monitor playback progress via your player console.";
                         return true;
                     }
 
@@ -191,7 +170,7 @@ namespace SlApi.Commands
                             return false;
                         }
 
-                        audioPlayer.ShouldPlay = true;
+                        audioPlayer.ShouldPlay = false;
 
                         response = "Audio paused.";
                         return true;

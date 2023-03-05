@@ -33,7 +33,7 @@ namespace SlApi.Features.RainbowWarhead
                 if (RainbowWarheadController.BlacklistedUsers.Contains(hub.characterClassManager.UserId))
                     continue;
 
-                _light.SetRoomColorForTargetOnly(hub, _origColor);
+                hub.TargetRoomColor(_light.Room, _origColor);
             }
 
             _light = null;
@@ -50,7 +50,7 @@ namespace SlApi.Features.RainbowWarhead
                 if (RainbowWarheadController.BlacklistedUsers.Contains(hub.characterClassManager.UserId))
                     continue;
 
-                _light.SetRoomColorForTargetOnly(hub, newColor);
+                hub.TargetRoomColor(_light.Room, newColor);
             }
         }
     }

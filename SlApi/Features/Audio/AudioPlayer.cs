@@ -7,14 +7,13 @@ using VoiceChat.Codec;
 using VoiceChat.Networking;
 using VoiceChat.Codec.Enums;
 
-using SlApi.Features.ThreadingHelpers;
+using SlApi.Features.AsyncHelpers;
 using SlApi.Features.Audio.Conversion.Ffmpeg;
 using SlApi.Features.Audio.Conversion.Ogg;
 using SlApi.Events;
 using SlApi.Events.CustomHandlers;
 
 using System;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -23,22 +22,16 @@ using YoutubeSearch;
 using YoutubeExplode;
 using YoutubeExplode.Videos;
 
-using PluginAPI.Core;
-
 using UnityEngine;
 
 using Utils.NonAllocLINQ;
 
 using SlApi.Extensions;
-using YoutubeExplode.Videos.Streams;
+using SlApi.Features.Audio.Conversion;
 
-namespace SlApi.Features.Audio
-{
-    public class AudioPlayer
-    {
+namespace SlApi.Features.Audio {
+    public class AudioPlayer : MonoBehaviour {
         public const int HeadSamples = 1920;
-        public const int EncodeBufferSize = 512;
-        public const int MaxPlaybackSize = 480;
 
         public static HashSet<AudioPlayer> AllPlayers { get; } = new HashSet<AudioPlayer>();
         public static HashSet<string> Mutes { get; } = new HashSet<string>();
@@ -46,448 +39,198 @@ namespace SlApi.Features.Audio
         public static VideoSearch YouTubeSearchClient { get; private set; } = new VideoSearch();
         public static YoutubeClient YouTubeDownloadClient { get; private set; } = new YoutubeClient();
 
-        private CoroutineHandle _playbackCoroutine;
-
-        public bool IsEnabled { get; set; }
-        public bool SendToSpeaker { get; set; } 
-
-        public ReferenceHub Speaker { get; set; }
-        public ReferenceHub Owner { get; set; }
+        public CoroutineHandle PlaybackCoroutineHandle { get; private set; }
 
         public AudioTrack CurrentTrack { get; private set; }
-
-        public HashSet<VoiceChatChannel> Channels { get; private set; } = new HashSet<VoiceChatChannel>()
-        { 
-            VoiceChatChannel.Proximity
-        };
-
-        public HashSet<string> Blacklisted { get; private set; } = new HashSet<string>();
-        public HashSet<string> Whitelisted { get; private set; } = new HashSet<string>();
+        public OpusEncoder Encoder { get; } = new OpusEncoder(OpusApplicationType.Voip);
+        public PlaybackBuffer PlaybackBuffer { get; } = new PlaybackBuffer();
+        public MemoryStream PlaybackStream { get; private set; }
+        public VorbisReader Reader { get; private set; }
 
         public Queue<AudioTrack> TrackQueue { get; private set; } = new Queue<AudioTrack>();
+        public Queue<float> StreamBuffer { get; } = new Queue<float>();
 
-        public float Volume { get; set; } = 100f;
+        public HashSet<string> Whitelist { get; } = new HashSet<string>();
+        public HashSet<string> Blacklist { get; } = new HashSet<string>();
 
-        public bool IsReady { get; set; }
-        public bool IsLooping { get; set; }
+        public byte[] EncodedBuffer { get; } = new byte[512];
 
-        public bool ShouldStop { get; set; }
+        public bool ShouldStop { get; private set; }
         public bool ShouldPlay { get; set; }
 
-        internal Queue<float> StreamBuffer { get; private set; } = new Queue<float>();
+        public bool IsReady { get; private set; }
+        public bool IsLooping { get; set; }
 
-        internal PlaybackBuffer PlaybackBuffer { get; private set; }
-        internal MemoryStream PlaybackStream { get; private set; }
-        internal VorbisReader Reader { get; private set; }
-        internal OpusEncoder Encoder { get; private set; }
+        public float Samples { get; private set; }
+        public float Volume { get; set; } = 100f;
 
-        internal int SamplesPerSecond { get; private set; }
+        public int SamplesPerSecond { get; private set; }
 
-        internal float Samples { get; private set; }
 
-        internal float[] SendBuffer { get; private set; }
-        internal float[] ReadBuffer { get; private set; }
+        public float[] SendBuffer { get; set; }
+        public float[] ReadBuffer { get; set; }
 
-        internal byte[] EncodeBuffer { get; private set; }
+        public ReferenceHub Owner { get; set; }
+        public ReferenceHub Speaker { get; set; }
 
-        public event Action<AudioTrack> OnTrackFinished;
-        public event Action<AudioTrack> OnTrackStarted;
-        public event Action<AudioTrack> OnTrackQueued;
-        public event Action<AudioTrack> OnTrackStopped;
+        public VoiceChatChannel VoiceChannel { get; set; } = VoiceChatChannel.Proximity;
 
-        static AudioPlayer()
-        {
+        static AudioPlayer() {
             EventHandlers.RegisterEvent(new GenericHandler(PluginAPI.Enums.ServerEventType.RoundRestart, OnRoundRestart));
         }
 
-        internal AudioPlayer(ReferenceHub owner, ReferenceHub speaker) 
-        {
+        public void Setup(ReferenceHub owner, ReferenceHub speaker) {
             Owner = owner;
             Speaker = speaker;
-
-            StaticUnityMethods.OnUpdate += OnUpdate;
-
-            PlaybackBuffer = new PlaybackBuffer();
-            Encoder = new OpusEncoder(OpusApplicationType.Audio);
-            EncodeBuffer = new byte[EncodeBufferSize];
-
-            OnTrackFinished += OnTrackFinishedHandler;
 
             AllPlayers.Add(this);
         }
 
-        public void Dispose()
-        {
-            Timing.KillCoroutines(_playbackCoroutine);
+        public void OnDestroy() {
+            Timing.KillCoroutines(PlaybackCoroutineHandle);
 
-            OnTrackFinished -= OnTrackFinishedHandler;
-            StaticUnityMethods.OnUpdate -= OnUpdate;
-
-            PlaybackStream.Dispose();
-            Reader.Dispose();
-            PlaybackBuffer.Dispose();
-            Encoder.Dispose();
-            StreamBuffer.Clear();
-            TrackQueue.Clear();
-            Channels.Clear();
-            Blacklisted.Clear();
-            Whitelisted.Clear();
-
-            EncodeBuffer = null;
             ReadBuffer = null;
             SendBuffer = null;
-            StreamBuffer = null;
-            TrackQueue = null;
-            Channels = null;
-            Speaker = null;
             Owner = null;
-            CurrentTrack = null;
-            YouTubeDownloadClient = null;
-            YouTubeSearchClient = null;
-            Whitelisted = null;
-            Blacklisted = null;
 
             AllPlayers.Remove(this);
         }
 
-        public bool TrySearch(AudioSearch search, out ThreadResult<AudioTrack> track, Action<ThreadResult<AudioTrack>> continueWith = null)
-        {
-            UpdateStatus($"TrySearch: {search.Query}");
+        public bool TryPlay(string query) {
+            if (Uri.TryCreate(query, UriKind.Absolute, out var uri))
+                return TryPlay(uri);
 
-            if (!Uri.TryCreate(search.Query, UriKind.Absolute, out var uri))
-                return TrySearchQuery(search, out track, continueWith);
-
-            UpdateStatus($"Created an URI: {uri.AbsoluteUri}");
-
-            track = ThreadHelper.RunThread(() =>
-            {
-                UpdateStatus($"Downloading ..");
-
-                var video = YouTubeDownloadClient.Videos.GetAsync(uri.AbsoluteUri).GetAwaiter().GetResult();
-
-                if (video is null)
-                {
-                    UpdateStatus($"Failed to fetch your video.");
-                    return null;
+            TaskHelper.RunAsAsyncUnsafe(YouTubeSearchClient.SearchQueryTaskAsync(query, 1), matches => {
+                if (matches is null || matches.Count <= 0) {
+                    UpdateStatus($"No matches.");
+                    return;
                 }
 
-                var manifest = YouTubeDownloadClient.Videos.Streams.GetManifestAsync(video.Id).GetAwaiter().GetResult();
+                var match = matches.First();
 
-                if (manifest is null)
-                {
-                    UpdateStatus("Failed to fetch the video's manifest.");
-                    return null;
-                }
-
-                var available = manifest.Streams.Where(x => x.Bitrate.BitsPerSecond <= VoiceChatSettings.MaxBitrate);
-                var stream = available.FirstOrDefault();
-
-                if (stream is null)
-                {
-                    UpdateStatus($"That video does not have any available streams.");
-                    return null;
-                }
-
-                var dStream = YouTubeDownloadClient.Videos.Streams.GetAsync(stream).GetAwaiter().GetResult();
-
-                if (dStream is null)
-                {
-                    UpdateStatus($"Failed to download the audio stream.");
-                    return null;
-                }
-
-                var memStream = new MemoryStream();
-
-                dStream.CopyToAsync(memStream).GetAwaiter().GetResult();
-
-                var bytes = memStream.ToArray();
-
-                dStream.Dispose();
-                memStream.Dispose();
-
-                UpdateStatus($"Downloaded {bytes.Length} bytes.");
-
-                return new AudioTrack
-                {
-                    Data = bytes,
-                    RequiresConvert = true,
-                    RequiresDownload = false,
-                    Url = uri.AbsoluteUri
-                };
-            }, continueWith);
+                UpdateStatus($"Selected first match: {match.Title}");
+                TryPlay(new Uri(match.Url));
+            });
 
             return true;
         }
 
-        public bool TrySearchQuery(AudioSearch search, out ThreadResult<AudioTrack> track, Action<ThreadResult<AudioTrack>> continueWith = null)
-        {
-            UpdateStatus($"TrySearchQuery: {search.Query}");
-
-            track = ThreadHelper.RunThread(() =>
-            {
-                try
-                {
-                    UpdateStatus($"Loading query results ..");
-
-                    var queryRes = YouTubeSearchClient.SearchQuery(search.Query, 1);
-
-                    UpdateStatus($"Loaded {queryRes.Count} query results.");
-
-                    if (queryRes is null || queryRes.Count < 0)
-                    {
-                        UpdateStatus($"Failed to find a video matching your query.");
-                        return null;
-                    }
-
-                    queryRes = queryRes.Where(x => VideoId.TryParse(x.Url).HasValue).ToList();
-
-                    if (queryRes is null || queryRes.Count < 0)
-                    {
-                        UpdateStatus($"Failed to find a video matching your query.");
-                        return null;
-                    }
-
-                    UpdateStatus($"Downloading {queryRes.First().Url} ..");
-
-                    var result = new AudioTrack();
-                    var task = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var video = await YouTubeDownloadClient.Videos.GetAsync(queryRes.First().Url);
-
-                            if (video is null)
-                            {
-                                UpdateStatus($"Failed to fetch your video.");
-                                return;
-                            }
-
-                            var manifest = YouTubeDownloadClient.Videos.Streams.GetManifestAsync(video.Id).GetAwaiter().GetResult();
-
-                            if (manifest is null)
-                            {
-                                UpdateStatus("Failed to fetch the video's manifest.");
-                                return;
-                            }
-
-                            var available = manifest.Streams.Where(x => x.Bitrate.BitsPerSecond <= VoiceChatSettings.MaxBitrate);
-                            var stream = available.FirstOrDefault();
-
-                            if (stream is null)
-                            {
-                                UpdateStatus($"That video does not have any available streams.");
-                                return;
-                            }
-
-                            var dStream = YouTubeDownloadClient.Videos.Streams.GetAsync(stream).GetAwaiter().GetResult();
-
-                            if (dStream is null)
-                            {
-                                UpdateStatus($"Failed to download the audio stream.");
-                                return;
-                            }
-
-                            var memStream = new MemoryStream();
-
-                            dStream.CopyToAsync(memStream).GetAwaiter().GetResult();
-
-                            var bytes = memStream.ToArray();
-
-                            dStream.Dispose();
-                            memStream.Dispose();
-
-                            UpdateStatus($"Downloaded {bytes.Length} bytes.");
-
-                            result.Data = bytes;
-                            result.Url = video.Url;
-                            result.RequiresDownload = false;
-                            result.RequiresConvert = true;
-                        }
-                        catch (Exception ex)
-                        {
-                            result = null;
-
-                            Log.Error(ex.ToString());
-                        }
-                    });
-
-                    task.Wait();
-
-                    return result;
+        private bool TryPlay(Uri uri) {
+            TaskHelper.RunAsAsyncUnsafe(YouTubeDownloadClient.Videos.GetAsync(VideoId.Parse(uri.AbsoluteUri)), video => {
+                if (video is null) {
+                    UpdateStatus($"Failed to find your video.");
+                    return;
                 }
-                catch (Exception ex)
-                {
-                    UpdateStatus(ex);
-                    return null;
-                }
-            }, continueWith);
 
-            return true;
-        }
-
-        public bool TryConvert(AudioTrack track, out ThreadResult<AudioTrack> converted, Action<ThreadResult<AudioTrack>> continueWith = null)
-        {
-            UpdateStatus($"Converting ..");
-
-            converted = ThreadHelper.RunThread(() =>
-            {
-                var ffmpegConverter = new FfmpegConverter();
-                var oggConverter = new OggConverter();
-
-                if (track.RequiresDownload)
-                {
-                    UpdateStatus($"Downloading ..");
-
-                    var video = YouTubeDownloadClient.Videos.GetAsync(track.Url).GetAwaiter().GetResult();
-
-                    if (video is null)
-                    {
-                        UpdateStatus($"Failed to fetch your video.");
-                        return null;
-                    }
-
-                    var manifest = YouTubeDownloadClient.Videos.Streams.GetManifestAsync(video.Id).GetAwaiter().GetResult();
-
-                    if (manifest is null)
-                    {
-                        UpdateStatus("Failed to fetch the video's manifest.");
-                        return null;
+                TaskHelper.RunAsAsyncUnsafe(YouTubeDownloadClient.Videos.Streams.GetManifestAsync(video.Id), manifest => {
+                    if (manifest is null) {
+                        UpdateStatus($"Failed to find your video's manifest.");
+                        return;
                     }
 
                     var available = manifest.Streams.Where(x => x.Bitrate.BitsPerSecond <= VoiceChatSettings.MaxBitrate);
                     var stream = available.FirstOrDefault();
 
-                    if (stream is null)
-                    {
+                    if (stream is null) {
                         UpdateStatus($"That video does not have any available streams.");
-                        return null;
+                        return;
                     }
 
-                    var dStream = YouTubeDownloadClient.Videos.Streams.GetAsync(stream).GetAwaiter().GetResult();
+                    TaskHelper.RunAsAsyncUnsafe(YouTubeDownloadClient.Videos.Streams.GetAsync(stream), dStream => {
+                        if (dStream is null) {
+                            UpdateStatus($"Failed to fetch the video's audio stream.");
+                            return;
+                        }
 
-                    if (dStream is null)
-                    {
-                        UpdateStatus($"Failed to download the audio stream.");
-                        return null;
-                    }
+                        byte[] bytes = null;
 
-                    var memStream = new MemoryStream();
+                        using (var memStream = new MemoryStream()) {
+                            dStream.CopyTo(memStream);
 
-                    dStream.CopyToAsync(memStream).GetAwaiter().GetResult();
+                            bytes = memStream.ToArray();
+                        }
 
-                    var bytes = memStream.ToArray();
+                        dStream.Dispose();
 
-                    dStream.Dispose();
-                    memStream.Dispose();
+                        UpdateStatus($"Downloaded {bytes.Length} bytes.");
 
-                    UpdateStatus($"Downloaded {bytes.Length} bytes.");
-
-                    track.Data = bytes;
-                }
-
-                UpdateStatus($"Converting to MP3 using FFMPEG ..");
-
-                if (ffmpegConverter.Convert(track.Data, new Conversion.ConversionProperties
-                {
-                    Channels = VoiceChatSettings.Channels,
-                    SampleRate = VoiceChatSettings.SampleRate
-                }, out var ffmpegConverted))
-                {
-                    UpdateStatus($"FFMPEG: Converted - {ffmpegConverted.Length} bytes.");
-                    UpdateStatus($"Converting to OGG ..");
-
-                    if (oggConverter.Convert(ffmpegConverted, new Conversion.ConversionProperties
-                    {
-                        Channels = VoiceChatSettings.Channels,
-                        SampleRate = VoiceChatSettings.SampleRate
-                    }, out var convertedBytes))
-                    {
-                        UpdateStatus($"OGG: Converted - {convertedBytes.Length} bytes.");
-
-                        return new AudioTrack
-                        {
-                            Data = convertedBytes,
-                            RequiresConvert = false,
+                        TryPlay(new AudioTrack {
+                            Data = bytes,
+                            RequiresConvert = true,
                             RequiresDownload = false,
-                            Url = track.Url
-                        };
-                    }
-                    else
-                    {
-                        UpdateStatus($"OGG conversion failed!");
-                        return null;
-                    }
-                }
-
-                UpdateStatus($"FFMPEG conversion failed'");
-
-                return null;
-            }, continueWith);
+                            Url = uri.AbsoluteUri
+                        });
+                    });
+                });
+            });
 
             return true;
         }
 
-        public bool TryPlay(AudioTrack track)
-        {
-            UpdateStatus($"TryPlay: {track.Url}");
+        public bool TryConvert(AudioTrack track) {
+            ThreadHelper.RunAsAsyncUnsafe(() => {
+                var ffmpegConverter = new FfmpegConverter();
+                var oggConverter = new OggConverter();
+                var props = new ConversionProperties
+                {
+                    Channels = VoiceChatSettings.Channels,
+                    SampleRate = VoiceChatSettings.SampleRate
+                };
 
-            if (CurrentTrack != null)
-            {
+                if (ffmpegConverter.Convert(track.Data, props, out var ffmpegBytes)) {
+                    UpdateStatus($"FFMPEG: Converted {ffmpegBytes.Length}/{track.Data.Length}");
+
+                    if (oggConverter.Convert(ffmpegBytes, props, out var oggBytes)) {
+                        UpdateStatus($"OGG: Converted {oggBytes.Length}/{ffmpegBytes.Length}/{track.Data.Length}");
+
+                        track.Data = oggBytes;
+                        track.RequiresConvert = false;
+
+                        TryPlay(track);
+                    }
+                    else {
+                        UpdateStatus("OGG conversion failed.");
+                    }
+                }
+                else {
+                    UpdateStatus("FFMPEG conversion failed.");
+                }
+            });
+
+            return true;
+        }
+
+        public bool TryPlay(AudioTrack track) {
+            if (CurrentTrack != null) {
                 TrackQueue.Enqueue(track);
-                OnTrackQueued?.Invoke(track);
                 UpdateStatus($"Queued: {track.Url}");
                 return true;
             }
 
-            if (track.RequiresConvert || track.RequiresDownload)
-            {
-                UpdateStatus($"Requested track requires conversion.");
-
-                TryConvert(track, out var res, x =>
-                {
-                    if (!x.IsError)
-                    {
-                        TryPlay(x.Result);
-                    }
-                    else
-                    {
-                        Log.Error($"Conversion failed: {x.Exception?.ToString() ?? "unknown error"}", "SL API::AudioPlayer");
-                    }
-                });
+            if (track.RequiresConvert) {
+                TryConvert(track);
                 return false;
             }
-            else
-            {
+            else {
                 ForcePlay(track);
                 return true;
             }
         }
 
-        public void Stop()
-        {
+        public void Stop() {
             CurrentTrack = null;
 
-            Timing.KillCoroutines(_playbackCoroutine);
-
-            PlaybackStream.Dispose();
-            Reader.Dispose();
-            PlaybackBuffer.Dispose();
-            Encoder.Dispose();
-            StreamBuffer.Clear();
-            TrackQueue.Clear();
+            Timing.KillCoroutines(PlaybackCoroutineHandle);
 
             UpdateStatus($"Stopped.");
         }
 
-        public void Skip()
-        {
-            if (!TrackQueue.TryDequeue(out var next))
-            {
+        public void Skip() {
+            if (!TrackQueue.TryDequeue(out var next)) {
                 Stop();
                 UpdateStatus($"Stopped.");
             }
-            else
-            {
+            else {
                 Stop();
                 TryPlay(next);
 
@@ -495,181 +238,121 @@ namespace SlApi.Features.Audio
             }
         }
 
-        private void ForcePlay(AudioTrack track)
-        {
+        private void ForcePlay(AudioTrack track) {
             CurrentTrack = track;
 
-            Timing.KillCoroutines(_playbackCoroutine);
+            Timing.KillCoroutines(PlaybackCoroutineHandle);
 
-            _playbackCoroutine = Timing.RunCoroutine(PlaybackCoroutine());
-
-            UpdateStatus($"ForcePlay: {track.Url}");
+            PlaybackCoroutineHandle = Timing.RunCoroutine(Playback());
         }
 
-        private void OnUpdate()
-        {
-            if (!IsEnabled
-                || !IsReady
-                || !ShouldPlay
-                || StreamBuffer.Count <= 0
-                || Speaker is null)
+        public virtual void Update() {
+            if (Speaker == null 
+                || !IsReady 
+                || StreamBuffer.Count == 0 
+                || !ShouldPlay)
                 return;
 
             Samples += Time.deltaTime * SamplesPerSecond;
 
-            var copy = Mathf.Min(Mathf.FloorToInt(Samples), StreamBuffer.Count);
-            if (copy > 0)
-            {
-                for (int i = 0; i < copy; i++)
-                {
+            int toCopy = Mathf.Min(Mathf.FloorToInt(Samples), StreamBuffer.Count);
+            if (toCopy > 0) {
+                for (int i = 0; i < toCopy; i++) {
                     PlaybackBuffer.Write(StreamBuffer.Dequeue() * (Volume / 100f));
                 }
             }
 
-            Samples -= copy;
-            while (PlaybackBuffer.Length >= MaxPlaybackSize)
-            {
-                PlaybackBuffer.ReadTo(SendBuffer, MaxPlaybackSize);
+            Samples -= toCopy;
 
-                var dataLen = Encoder.Encode(SendBuffer, EncodeBuffer, MaxPlaybackSize);
+            while (PlaybackBuffer.Length >= 480) {
+                PlaybackBuffer.ReadTo(SendBuffer, (long)480, 0L);
+                int dataLen = Encoder.Encode(SendBuffer, EncodedBuffer, 480);
 
-                foreach (var channel in Channels)
-                {
-                    var msg = new VoiceMessage(Speaker, channel, EncodeBuffer, dataLen, false);
+                foreach (var plr in ReferenceHub.AllHubs) {
+                    if (plr.connectionToClient == null) 
+                        continue;
 
-                    ReferenceHub.AllHubs.ForEach(x =>
-                    {
-                        if (x.Mode != ClientInstanceMode.ReadyClient)
-                            return;
+                    if (Mutes.Contains(plr.UserId()))
+                        continue;
 
-                        if (x.netId == Speaker.netId && !SendToSpeaker)
-                            return;
+                    if (Blacklist.Contains(plr.UserId()))
+                        continue;
 
-                        if (Blacklisted.Contains(x.characterClassManager.UserId))
-                            return;
+                    if (Whitelist.Count > 0 && !Whitelist.Contains(plr.UserId()))
+                        continue;
 
-                        if (Whitelisted.Any() && !Whitelisted.Contains(x.characterClassManager.UserId))
-                            return;
-
-                        if (Mutes.Contains(x.characterClassManager.UserId))
-                            return;
-
-                        x.connectionToClient.Send(msg);
-                    });
+                    plr.connectionToClient.Send(new VoiceMessage(Speaker, VoiceChannel, EncodedBuffer, dataLen, false));
                 }
             }
         }
 
-        private IEnumerator<float> PlaybackCoroutine()
-        {
-            ShouldStop = false;
-            ShouldPlay = true;
+        public virtual IEnumerator<float> Playback() {
 
-            if (CurrentTrack is null)
-                yield break;
+            ShouldStop = false;
 
             PlaybackStream = new MemoryStream(CurrentTrack.Data);
             PlaybackStream.Seek(0, SeekOrigin.Begin);
 
             Reader = new VorbisReader(PlaybackStream);
-
-            if (Reader.Channels != VoiceChatSettings.Channels)
-            {
-                Log.Error("Only mono audio is supported.", "SL API::AudioPlayer");
-
-                Reader.Dispose();
-                PlaybackStream.Dispose();
-
-                OnTrackStopped?.Invoke(CurrentTrack);
-
-                yield break;
-            }
-
-            if (Reader.SampleRate != VoiceChatSettings.SampleRate)
-            {
-                Log.Error("Sample rate mismatch.", "SL API::AudioPlayer");
-
-                Reader.Dispose();
-                PlaybackStream.Dispose();
-
-                OnTrackStopped?.Invoke(CurrentTrack);
-
-                CurrentTrack = null;
-
-                yield break;
-            }
-
             SamplesPerSecond = VoiceChatSettings.SampleRate * VoiceChatSettings.Channels;
-
-            SendBuffer = new float[(SamplesPerSecond / 5) + HeadSamples];
-            ReadBuffer = new float[(SamplesPerSecond / 5) + HeadSamples];
-
-            UpdateStatus($"Channels: {Reader.Channels}");
-            UpdateStatus($"Sample rate: {Reader.SampleRate}");
-            UpdateStatus($"Samples per sec: {SamplesPerSecond}");
-            UpdateStatus($"Buffers: {SendBuffer.Length} / {ReadBuffer.Length}");
-
-            OnTrackStarted?.Invoke(CurrentTrack);
-
-            UpdateStatus($"Starting playback ..");
+            SendBuffer = new float[SamplesPerSecond / 5 + HeadSamples];
+            ReadBuffer = new float[SamplesPerSecond / 5 + HeadSamples];
 
             int cnt;
-            while ((cnt = Reader.ReadSamples(ReadBuffer, 0, ReadBuffer.Length)) > 0)
-            {
-                if (ShouldStop)
-                {
+            while ((cnt = Reader.ReadSamples(ReadBuffer, 0, ReadBuffer.Length)) > 0) {
+                if (ShouldStop) {
                     Reader.SeekTo(Reader.TotalSamples - 1);
                     ShouldStop = false;
                 }
-
-                while (!ShouldPlay)
+                while (!ShouldPlay) {
                     yield return Timing.WaitForOneFrame;
-
-                while (StreamBuffer.Count >= ReadBuffer.Length)
-                {
+                }
+                while (StreamBuffer.Count >= ReadBuffer.Length) {
                     IsReady = true;
                     yield return Timing.WaitForOneFrame;
                 }
-
-                for (int i = 0; i < ReadBuffer.Length; i++)
+                for (int i = 0; i < ReadBuffer.Length; i++) {
                     StreamBuffer.Enqueue(ReadBuffer[i]);
+                }
             }
 
-            OnTrackStopped?.Invoke(CurrentTrack);
-            OnTrackFinished?.Invoke(CurrentTrack);
-            CurrentTrack = null;
-
-            UpdateStatus($"Playback finished.");
+            OnTrackFinishedHandler(CurrentTrack);
         }
 
-        private void OnTrackFinishedHandler(AudioTrack track)
-        {
+        private void OnTrackFinishedHandler(AudioTrack track) {
+            if (IsLooping) {
+                ForcePlay(track);
+                return;
+            }
+
             if (TrackQueue.TryDequeue(out var next))
                 TryPlay(next);
         }
 
-        private void UpdateStatus(object message)
-        {
+        private void UpdateStatus(object message) {
             if (Owner is null)
                 return;
 
             Owner.ConsoleMessage(message);
+            Owner.queryProcessor.TargetReply(Owner.connectionToClient, message.ToString(), true, true, "");
         }
 
-        public static AudioPlayer Create(ReferenceHub owner, ReferenceHub speaker)
-            => new AudioPlayer(owner, speaker);
+        public static AudioPlayer Create(ReferenceHub owner, ReferenceHub speaker) {
+            var player = speaker.gameObject.AddComponent<AudioPlayer>();
 
-        public static bool TryGet(ReferenceHub owner, out AudioPlayer player)
-        {
-            player = AllPlayers.FirstOrDefault(x => x.Owner != null && x.Owner.netId == owner.netId);
+            player.Setup(owner, speaker);
+
+            return player;
+        }
+
+        public static bool TryGet(ReferenceHub owner, out AudioPlayer player) {
+            player = AllPlayers.FirstOrDefault(x => x.Owner != null && x.Owner.netId == owner.netId) ?? owner.GetComponent<AudioPlayer>();
             return player != null;
         }
 
-        private static void OnRoundRestart(object[] args)
-        {
-            foreach (var player in AllPlayers)
-            {
-                player.Dispose();
+        private static void OnRoundRestart(object[] args) {
+            foreach (var player in AllPlayers) {
+                GameObject.Destroy(player);
             }
 
             AllPlayers.Clear();

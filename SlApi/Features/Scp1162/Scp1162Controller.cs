@@ -1,4 +1,4 @@
-﻿using AzyWorks.Randomization.Weighted;
+﻿using AzyWorks.System.Weights;
 using Footprinting;
 using HarmonyLib;
 
@@ -137,7 +137,7 @@ namespace SlApi.Features.Scp1162
             if (outputItem is null)
                 return false;
 
-            var outItem = WeightPicker.Pick(outputItem.OutputItems, x => x.Value).Key;
+            var outItem = WeightPick.Pick(outputItem.OutputItems, x => x.Value).Key;
             if (outItem is ItemType.None)
                 return false;
 

@@ -98,7 +98,7 @@ namespace SlApi.Features
 
             if (lockDoors)
             {
-                string id = StaticRandom.RandomTicket(20);
+                string id = AzyWorks.System.RandomGenerator.Ticket(20);
 
                 var session = new BlackoutSession();
 
